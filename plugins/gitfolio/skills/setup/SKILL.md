@@ -28,9 +28,8 @@ ask, and never guess an email, a code or a repository.
    `login_verify` with `signup: true` only once they agree, and ask whether they want aline.team service
    emails (`notifications`: no unless they say yes).
 4. **Repositories.** Ask which repositories to register (suggest the current one). Tell them each gets git
-   hooks (post-commit, pre-push) in this computer's `.git` folder only: nothing is added to the repository
-   or its remote, they never stop a commit or push, hooks they have still run first, and `gitfolio remove`
-   undoes it. Call `add_repository` for each. If a repository's git email is not the account's, offer
+   hooks (post-commit, pre-push) on this computer only: nothing is added to the repository or its remote,
+   and `gitfolio remove` undoes it. Call `add_repository` for each. If a repository's git email is not the account's, offer
    `email_start`: aline.team takes commits only under verified emails. The user enters that code in the
    app or a terminal too (`enterCode`), never here.
 5. **What AI tools may see**, for each repository:

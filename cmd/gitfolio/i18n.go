@@ -275,10 +275,8 @@ var appMessages = map[string]map[string]string{
  - Logs in to aline.team; an email without an account gets a new one
    (agreeing to the terms of service and the privacy policy).
  - Installs git hooks (post-commit, pre-push) in the repositories you
-   choose, in this computer's .git folder only: nothing is added to the
-   repository or its remote. They never stop a commit or push, hooks you
-   already have still run first, and removing the repository from
-   GitFolio puts them back as they were.
+   choose, on this computer only: nothing is added to the repository or
+   its remote. Removing the repository from GitFolio takes them out.
  - Keeps the collected commit information on this computer: %s
  - Automatic sync sends the past commits of the chosen repositories right
    away, then after every git push. Local mode sends nothing on its
@@ -287,17 +285,15 @@ var appMessages = map[string]map[string]string{
    scheduler (launchd, systemd or cron, Task Scheduler).
  - Dependency detection, if you turn it on, reads only the package
    manager files you approve.
- - AI coding tools connected to GitFolio see a repository by its real
-   name at most: no commit messages, branch names or file paths unless
-   you allow them.
+ - AI coding tools connected to GitFolio see a repository's name by
+   default; what more they see is set per repository.
 `,
 		"ko": ` [GitFolio를 시작하면 하는 일]
  - aline.team에 로그인합니다. 계정이 없는 이메일이면 새 계정을 만듭니다
    (이용약관·개인정보처리방침 동의).
- - 고른 저장소에 git 훅(post-commit·pre-push)을 이 컴퓨터의 .git 폴더에만
-   설치합니다. 저장소와 원격 저장소에는 아무것도 추가되지 않습니다.
-   commit·push를 막지 않고, 원래 있던 훅은 그대로 먼저 실행되며,
-   GitFolio에서 저장소를 빼면 원래대로 돌립니다.
+ - 고른 저장소에 git 훅(post-commit·pre-push)을 이 컴퓨터에만 설치합니다.
+   저장소와 원격 저장소에는 아무것도 추가되지 않으며, GitFolio에서 저장소를
+   빼면 되돌립니다.
  - 수집한 커밋 정보를 이 컴퓨터에 저장합니다: %s
  - 자동 동기화는 고른 저장소의 지난 커밋 기록을 바로 보내고, 이후 git push
    때마다 보냅니다. 로컬 모드는 평소에는 보내지 않고, 볼 때만 aline.team
@@ -305,17 +301,15 @@ var appMessages = map[string]map[string]string{
  - 매일 동기화를 고르면 이 컴퓨터의 예약 작업(launchd, systemd 또는 cron,
    작업 스케줄러)에 등록합니다.
  - 의존성 분석을 켜면 승인한 패키지 매니저 파일만 읽습니다.
- - GitFolio에 연결한 AI 코딩 도구에는 저장소가 실제 이름까지만 보이고,
-   커밋 메시지·브랜치 이름·파일 경로는 허용하기 전에는 보이지 않습니다.
+ - GitFolio에 연결한 AI 코딩 도구에는 기본으로 저장소 이름만 보이고, 더
+   보일지는 저장소마다 정합니다.
 `,
 		"ja": ` [GitFolio を始めると行うこと]
  - aline.team にログインします。アカウントのないメールアドレスなら
    新しいアカウントを作ります(利用規約・プライバシーポリシーに同意)。
- - 選んだリポジトリに git フック(post-commit・pre-push)を、この
-   コンピュータの .git フォルダにだけインストールします。リポジトリや
-   リモートには何も追加されません。commit・push を止めることはなく、
-   既存のフックはそのまま先に実行され、GitFolio からリポジトリを外すと
-   元に戻ります。
+ - 選んだリポジトリに git フック(post-commit・pre-push)をこのコンピュータに
+   だけインストールします。リポジトリやリモートには何も追加されず、
+   GitFolio からリポジトリを外すと元に戻ります。
  - 収集したコミット情報をこのコンピュータに保存します: %s
  - 自動同期は、選んだリポジトリの過去のコミット記録をすぐに送り、
    以後 git push のたびに送ります。ローカルモードは普段は送らず、
@@ -324,9 +318,8 @@ var appMessages = map[string]map[string]string{
    または cron、タスク スケジューラ)に登録します。
  - 依存関係の分析をオンにすると、承認したパッケージマネージャー
    ファイルだけを読みます。
- - GitFolio に接続した AI コーディングツールには、リポジトリは実名までしか
-   見えず、コミットメッセージ・ブランチ名・ファイルパスは許可するまで
-   見えません。
+ - GitFolio に接続した AI コーディングツールには既定でリポジトリ名だけが
+   見え、それ以上はリポジトリごとに決めます。
 `,
 	},
 }
@@ -562,9 +555,9 @@ var messages = map[string]map[string]string{
 		"ja": "\ngit の user.email が設定されていないため、あなたのコミットを識別できません。\n設定方法: git config --global user.email you@example.com\n",
 	},
 	"depsNotice": {
-		"en": "Dependency detection reads the package manager files you select (package.json, go.mod,\npom.xml, build.gradle, ...) in each repository, only to detect dependencies.\nOnly dependency names and versions are kept, and only the names of those in modules your commits changed\nare sent to aline.team, which adds them to your tech stack. File contents and paths are never stored or sent.\nThey are read only when you ask: right after you approve them, with `gitfolio deps scan`,\nor by scan, sync and the daily sync if you turn that on (`gitfolio deps auto on`). Pushes never read them.\n",
-		"ko": "의존성 분석은 저장소마다 사용자가 고른 패키지 매니저 파일(package.json, go.mod,\npom.xml, build.gradle 등)만, 의존성 파악 용도로만 읽습니다.\n의존성 이름과 버전만 남기고, 그중 내 커밋이 바꾼 모듈의 의존성 이름만 aline.team에 보내 기술 스택에 넣습니다.\n파일 원문과 경로는 저장하지도 전송하지도 않습니다.\n읽는 때는 요청할 때뿐입니다: 승인한 직후, `gitfolio deps scan` 실행 시, 켜 두었다면 scan·sync·예약 동기화 때\n(`gitfolio deps auto on`). push 때는 읽지 않습니다.\n",
-		"ja": "依存関係の分析では、リポジトリごとにあなたが選んだパッケージマネージャーのファイル\n(package.json、go.mod、pom.xml、build.gradle など)のみを、依存関係の把握のためだけに読み取ります。\n依存関係の名前とバージョンのみを保持し、そのうち自分のコミットが変更したモジュールの依存関係の名前だけを\naline.team に送信して技術スタックに加えます。ファイルの内容とパスは保存も送信もしません。\n読むのは求められたときだけです: 承認した直後、`gitfolio deps scan` の実行時、オンにした場合は scan・sync・予約同期のとき\n(`gitfolio deps auto on`)。push のときは読みません。\n",
+		"en": "Dependency detection reads only the package manager files you select (package.json, go.mod, ...) and adds the\nnames of the dependencies to your tech stack.\n",
+		"ko": "의존성 분석은 고른 패키지 매니저 파일(package.json, go.mod 등)만 읽어 의존성 이름을 기술 스택에 넣습니다.\n",
+		"ja": "依存関係の分析は、選んだパッケージマネージャーのファイル(package.json、go.mod など)だけを読み、依存関係の名前を\n技術スタックに加えます。\n",
 	},
 	"policyAgree": {
 		"en": "Do you agree to this data policy and go on?",
@@ -577,14 +570,14 @@ var messages = map[string]map[string]string{
 		"ja": "何も設定していません。準備ができたら `gitfolio init` を再実行してください。\n",
 	},
 	"hooksNotice": {
-		"en": "GitFolio adds git hooks (post-commit, pre-push) to the chosen repositories: they note the AI tools used at commit\ntime and collect each push (and send it, with automatic sync). They stay in this computer's .git folder (with husky,\nin .husky/_, which git ignores): nothing is added to the repository or its remote, and nobody else is affected.\nThey never stop a commit or push, hooks already there still run first, and `gitfolio remove` puts them back.\n",
-		"ko": "고른 저장소에 git 훅(post-commit·pre-push)을 추가합니다. 커밋할 때 쓴 AI 도구를 기록하고 push한 커밋을\n수집합니다(자동 동기화라면 바로 보냄). 훅은 이 컴퓨터의 .git 폴더(husky는 git이 무시하는 .husky/_)에만 들어가,\n저장소와 원격 저장소에는 아무것도 추가되지 않고 다른 사람에게도 영향이 없습니다.\ncommit·push를 막지 않고, 원래 있던 훅은 그대로 먼저 실행되며, `gitfolio remove`로 원래대로 돌립니다.\n",
-		"ja": "選んだリポジトリに git フック(post-commit・pre-push)を追加します。コミット時に使った AI ツールを記録し、\npush したコミットを収集します(自動同期ならすぐ送信)。フックはこのコンピュータの .git フォルダ(husky では git が\n無視する .husky/_)にだけ入り、リポジトリやリモートには何も追加されず、他の人にも影響しません。\ncommit・push を止めることはなく、既存のフックはそのまま先に実行され、`gitfolio remove` で元に戻ります。\n",
+		"en": "GitFolio adds git hooks (post-commit, pre-push) to the chosen repositories, on this computer only:\nnothing is added to the repository or its remote. `gitfolio remove` takes them out.\n",
+		"ko": "고른 저장소에 git 훅(post-commit·pre-push)을 이 컴퓨터에만 추가합니다.\n저장소와 원격 저장소에는 아무것도 추가되지 않으며, `gitfolio remove`로 되돌립니다.\n",
+		"ja": "選んだリポジトリに git フック(post-commit・pre-push)をこのコンピュータにだけ追加します。\nリポジトリやリモートには何も追加されず、`gitfolio remove` で元に戻ります。\n",
 	},
 	"aiNameAsk": {
-		"en": "How should AI coding tools (Claude Code, Codex: gitfolio mcp) see the chosen repositories?\n1) by their real names  2) anonymous (\"Repository 1\")  3) not at all\nFile paths are never shown; set each repository later with `gitfolio config ai`.",
-		"ko": "AI 코딩 도구(Claude Code·Codex: gitfolio mcp)에 고른 저장소를 어떻게 보일까요?\n1) 실제 이름으로  2) 익명으로(\"저장소 1\")  3) 보이지 않게\n파일 경로는 보이지 않으며, 저장소별로는 나중에 `gitfolio config ai`로 바꿉니다.",
-		"ja": "AI コーディングツール(Claude Code・Codex: gitfolio mcp)に選んだリポジトリをどう見せますか?\n1) 実名で  2) 匿名で(\"リポジトリ 1\")  3) 見せない\nファイルパスは見せません。リポジトリごとには後で `gitfolio config ai` で変更します。",
+		"en": "How should AI coding tools (Claude Code, Codex: gitfolio mcp) see the chosen repositories?\n1) by their real names  2) anonymous (\"Repository 1\")  3) not at all\nSet each repository later with `gitfolio config ai`.",
+		"ko": "AI 코딩 도구(Claude Code·Codex: gitfolio mcp)에 고른 저장소를 어떻게 보일까요?\n1) 실제 이름으로  2) 익명으로(\"저장소 1\")  3) 보이지 않게\n저장소별로는 나중에 `gitfolio config ai`로 바꿉니다.",
+		"ja": "AI コーディングツール(Claude Code・Codex: gitfolio mcp)に選んだリポジトリをどう見せますか?\n1) 実名で  2) 匿名で(\"リポジトリ 1\")  3) 見せない\nリポジトリごとには後で `gitfolio config ai` で変更します。",
 	},
 	"aiDetailAsk": {
 		"en": "Should they also see commit messages and branch names?\n1) no  2) subjects and branch names  3) whole messages and branch names",
@@ -601,9 +594,8 @@ var messages = map[string]map[string]string{
  - Logs in to aline.team; an email without an account gets a new one
    (agreeing to the terms of service and the privacy policy).
  - Installs git hooks (post-commit, pre-push) in the repositories you
-   choose, in this computer's .git folder only: nothing is added to the
-   repository or its remote. They never stop a commit or push, hooks you
-   already have still run first, and gitfolio remove puts them back.
+   choose, on this computer only: nothing is added to the repository or
+   its remote. gitfolio remove takes them out.
  - Keeps the collected commit information on this computer: %s
  - Automatic sync sends the past commits of the chosen repositories right
    away, then after every git push. Local mode sends nothing on its
@@ -612,17 +604,15 @@ var messages = map[string]map[string]string{
    scheduler (launchd, systemd or cron, Task Scheduler).
  - Dependency detection, if you turn it on, reads only the package
    manager files you approve.
- - AI coding tools (gitfolio mcp) see a repository by its real name at
-   most: no commit messages, branch names or file paths unless you allow
-   them (gitfolio config ai).
+ - AI coding tools (gitfolio mcp) see a repository's name by default;
+   what more they see is set per repository (gitfolio config ai).
 `,
 		"ko": ` [GitFolio를 시작하면 하는 일]
  - aline.team에 로그인합니다. 계정이 없는 이메일이면 새 계정을 만듭니다
    (이용약관·개인정보처리방침 동의).
- - 고른 저장소에 git 훅(post-commit·pre-push)을 이 컴퓨터의 .git 폴더에만
-   설치합니다. 저장소와 원격 저장소에는 아무것도 추가되지 않습니다.
-   commit·push를 막지 않고, 원래 있던 훅은 그대로 먼저 실행되며,
-   gitfolio remove로 원래대로 돌립니다.
+ - 고른 저장소에 git 훅(post-commit·pre-push)을 이 컴퓨터에만 설치합니다.
+   저장소와 원격 저장소에는 아무것도 추가되지 않으며, gitfolio remove로
+   되돌립니다.
  - 수집한 커밋 정보를 이 컴퓨터에 저장합니다: %s
  - 자동 동기화는 고른 저장소의 지난 커밋 기록을 바로 보내고, 이후 git push
    때마다 보냅니다. 로컬 모드는 평소에는 보내지 않고, 볼 때만 aline.team
@@ -630,17 +620,15 @@ var messages = map[string]map[string]string{
  - 매일 동기화를 고르면 이 컴퓨터의 예약 작업(launchd, systemd 또는 cron,
    작업 스케줄러)에 등록합니다.
  - 의존성 분석을 켜면 승인한 패키지 매니저 파일만 읽습니다.
- - AI 코딩 도구(gitfolio mcp)에는 저장소가 실제 이름까지만 보이고, 커밋
-   메시지·브랜치 이름·파일 경로는 허용하기 전에는 보이지 않습니다
-   (gitfolio config ai).
+ - AI 코딩 도구(gitfolio mcp)에는 기본으로 저장소 이름만 보이고, 더 보일지는
+   저장소마다 정합니다(gitfolio config ai).
 `,
 		"ja": ` [GitFolio を始めると行うこと]
  - aline.team にログインします。アカウントのないメールアドレスなら
    新しいアカウントを作ります(利用規約・プライバシーポリシーに同意)。
- - 選んだリポジトリに git フック(post-commit・pre-push)を、この
-   コンピュータの .git フォルダにだけインストールします。リポジトリや
-   リモートには何も追加されません。commit・push を止めることはなく、
-   既存のフックはそのまま先に実行され、gitfolio remove で元に戻ります。
+ - 選んだリポジトリに git フック(post-commit・pre-push)をこのコンピュータに
+   だけインストールします。リポジトリやリモートには何も追加されず、
+   gitfolio remove で元に戻ります。
  - 収集したコミット情報をこのコンピュータに保存します: %s
  - 自動同期は、選んだリポジトリの過去のコミット記録をすぐに送り、
    以後 git push のたびに送ります。ローカルモードは普段は送らず、
@@ -649,9 +637,8 @@ var messages = map[string]map[string]string{
    または cron、タスク スケジューラ)に登録します。
  - 依存関係の分析をオンにすると、承認したパッケージマネージャー
    ファイルだけを読みます。
- - AI コーディングツール(gitfolio mcp)には、リポジトリは実名までしか
-   見えず、コミットメッセージ・ブランチ名・ファイルパスは許可するまで
-   見えません(gitfolio config ai)。
+ - AI コーディングツール(gitfolio mcp)には既定でリポジトリ名だけが見え、
+   それ以上はリポジトリごとに決めます(gitfolio config ai)。
 `,
 	},
 	"syncModeNotice": {
@@ -700,9 +687,9 @@ var messages = map[string]map[string]string{
 		"ja": "あなたのコミットがある新しいリポジトリは見つかりませんでした。\n",
 	},
 	"companyNotice": {
-		"en": "Repositories with your commits are listed above (commits, latest date).\nFrom the chosen ones, commit information is sent, never source code; sensitive parts of commit messages are masked.\nHide customer or internal project names in commit messages with `gitfolio config mask add <word>`.\n",
-		"ko": "위는 본인 커밋이 있는 저장소입니다. (커밋 수, 최근 커밋 날짜)\n선택한 저장소는 소스 코드 없이 커밋 정보만 전송하며, 커밋 메시지의 민감한 부분은 가려서 보냅니다.\n커밋 메시지 속 고객사·사내 프로젝트명은 `gitfolio config mask add <단어>`로 가릴 수 있습니다.\n",
-		"ja": "上記はあなたのコミットがあるリポジトリです。(コミット数、最新コミット日)\n選択したリポジトリからは、ソースコードではなくコミット情報のみを送信し、コミットメッセージの機密部分はマスキングします。\nコミットメッセージ内の顧客名や社内プロジェクト名は `gitfolio config mask add <単語>` で隠せます。\n",
+		"en": "Repositories with your commits are listed above (commits, latest date).\nHide customer or internal project names in commit messages with `gitfolio config mask add <word>`.\n",
+		"ko": "위는 본인 커밋이 있는 저장소입니다. (커밋 수, 최근 커밋 날짜)\n커밋 메시지 속 고객사·사내 프로젝트명은 `gitfolio config mask add <단어>`로 가릴 수 있습니다.\n",
+		"ja": "上記はあなたのコミットがあるリポジトリです。(コミット数、最新コミット日)\nコミットメッセージ内の顧客名や社内プロジェクト名は `gitfolio config mask add <単語>` で隠せます。\n",
 	},
 	"selectRepos": {
 		"en": "Which repositories should GitFolio collect? [all / 1,3,5-7 / Enter = none] > ",

@@ -310,7 +310,7 @@ func TestSetupJSON(t *testing.T) {
 	}
 
 	if v := must(run(cmdInit, "--policy")); !strings.Contains(fmt.Sprint(v["policy"]), "Source code is never collected") ||
-		!strings.Contains(fmt.Sprint(v["setupActions"]), "in this computer's .git folder only") {
+		!strings.Contains(fmt.Sprint(v["setupActions"]), "on this computer only") {
 		t.Errorf("policy: %v", v)
 	}
 	if _, err := run(cmdInit, "--scan", "--root", root); errorCode(err) != "loginFirst" {

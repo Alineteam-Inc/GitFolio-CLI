@@ -91,8 +91,7 @@ gitfolio init
 
 `gitfolio init` shows the data policy and asks you to agree, signs you up or logs you in with a code
 sent to your email, and lets you choose the repositories. It adds git hooks to the chosen repositories,
-in this computer's `.git` folder only: nothing is added to the repository or its remote, and they never
-stop a commit or push. It then asks what matters before anything happens: what AI coding tools may see
+on this computer only. It then asks what matters before anything happens: what AI coding tools may see
 of the repositories, and whether to sync with aline.team automatically (no means local mode). Your profile on the web is at
 [aline.team/profile](https://aline.team/profile). GitFolio needs git; when it is missing, init offers to
 install it with your system's installer (the Command Line Tools on macOS, winget on Windows, the
@@ -283,8 +282,7 @@ gitfolio init
 ```
 
 `gitfolio init`은 데이터 정책을 보여 주고 동의를 받은 뒤, 이메일로 받은 코드로 가입·로그인하고 저장소를 고르게 합니다.
-고른 저장소에는 git 훅을 이 컴퓨터의 `.git` 폴더에만 추가합니다. 저장소와 원격 저장소에는 아무것도 추가되지 않고,
-commit·push를 막지 않습니다. 그다음 실제로 무언가 하기 전에 중요한 것을 묻습니다. AI 코딩 도구에 저장소를
+고른 저장소에는 git 훅을 이 컴퓨터에만 추가합니다. 그다음 실제로 무언가 하기 전에 중요한 것을 묻습니다. AI 코딩 도구에 저장소를
 어디까지 보일지, aline.team과 자동으로 동기화할지(아니요 = 로컬 모드)입니다. 웹 프로필은
 [aline.team/profile](https://aline.team/profile)에서 봅니다. GitFolio는 git이 필요하며, git이 없으면 init이 시스템 설치
 도구(macOS는 Command Line Tools, Windows는 winget, Linux는 패키지 관리자)로 설치할지 묻습니다.
