@@ -197,25 +197,9 @@ func writeFile(p string, b []byte) error {
 	return err
 }
 
-func readCommits(dir string) ([]Commit, error) {
-	f, err := os.Open(filepath.Join(dir, "commits.jsonl"))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	var commits []Commit
-	sc := bufio.NewScanner(f)
-	sc.Buffer(nil, 16<<20) // long commit messages
-	for sc.Scan() {
-		var c Commit
-		if json.Unmarshal(sc.Bytes(), &c) == nil { // skip a line cut short (a full disk, a crash): the next scan collects it again
-			commits = append(commits, c)
-		}
-	}
-	return commits, sc.Err()
+func readCommits(dir string) (commits []Commit, err error) {
+	err = decodeJSONL(filepath.Join(dir, "commits.jsonl"), func(c Commit) { commits = append(commits, c) })
+	return commits, err
 }
 
 func appendCommits(dir string, commits []Commit) error {
@@ -229,6 +213,28 @@ func writeCommits(dir string, commits []Commit) error {
 		return err
 	}
 	return os.Rename(p+".tmp", p)
+}
+
+// decodeJSONL gives each JSON line at p to each. A line cut short (a full disk, a crash) is skipped: the
+// next scan collects that commit, or the next commit notes its agents, again. No file yet: no lines.
+func decodeJSONL[T any](p string, each func(T)) error {
+	f, err := os.Open(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	sc.Buffer(nil, 16<<20) // long commit messages
+	for sc.Scan() {
+		var v T
+		if json.Unmarshal(sc.Bytes(), &v) == nil {
+			each(v)
+		}
+	}
+	return sc.Err()
 }
 
 func encodeJSONL[T any](p string, flag int, items []T) error {
@@ -259,23 +265,9 @@ func appendAgentTag(dir string, t agentTag) error {
 // readAgentTags returns the recorded agents by commit hash.
 // ponytail: the file only grows; prune tags of stored commits if it ever gets large.
 func readAgentTags(dir string) (map[string][]string, error) {
-	f, err := os.Open(filepath.Join(dir, "agent-tags.jsonl"))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
 	tags := map[string][]string{}
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		var t agentTag
-		if json.Unmarshal(sc.Bytes(), &t) == nil { // skip a line cut short by a crash
-			tags[t.Hash] = append(tags[t.Hash], t.Agents...)
-		}
-	}
-	return tags, sc.Err()
+	err := decodeJSONL(filepath.Join(dir, "agent-tags.jsonl"), func(t agentTag) { tags[t.Hash] = append(tags[t.Hash], t.Agents...) })
+	return tags, err
 }
 
 // scanRepo stores the user's commits in r that are not stored yet and returns how many were added.
