@@ -29,6 +29,8 @@ also needs Chrome, Edge or Chromium (optional; Markdown needs nothing).
 
 ### macOS
 
+macOS 13 (Ventura) or later.
+
 ```sh
 brew install Alineteam-Inc/tap/gitfolio
 ```
@@ -227,6 +229,8 @@ Releases up to v0.4.1 were published under MIT.
 필요합니다(선택, Markdown은 필요 없음).
 
 **macOS**
+
+macOS 13(Ventura) 이상.
 
 ```sh
 brew install Alineteam-Inc/tap/gitfolio
