@@ -215,23 +215,7 @@ func cmdEmail(dir string, args []string) error {
 
 // finishEmailCode tries the code sent to work email e by an earlier run (email verify without --code).
 func finishEmailCode(dir string, c *client, e, code string) error {
-	s, ok, err := keptCode(dir, "email", e)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return failure("codeNotSent", e)
-	}
-	if !validCode(code, s.length) {
-		return failure("codeFormat", s.length)
-	}
-	err = c.finishEmailCheck(s, code)
-	if err == nil || codeEnded(err) { // a wrong code keeps it: aline.team takes a few tries
-		if kerr := keepCode(dir, "email", e, nil); err == nil {
-			err = kerr
-		}
-	}
-	return err
+	return finishKept(dir, "email", e, code, func(s codeStart) error { return c.finishEmailCheck(s, code) })
 }
 
 // emailsJSON is the work emails for a program: the primary first, each verified or not.

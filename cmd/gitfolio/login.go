@@ -80,43 +80,58 @@ func cmdLogin(dir string, args []string) error {
 	if jsonOut {
 		return printJSON(map[string]any{"email": res.Account.Email, "created": res.Account.Created, "verifiedEmails": res.VerifiedEmails})
 	}
-	if res.Account.Created {
-		show(out, fmt.Sprintf(tr(lang, "signedUp"), res.Account.Email)+tr(lang, "passwordMail"))
-	} else {
-		say(lang, "loggedIn", res.Account.Email)
-	}
+	sayLoggedIn(lang, res)
 	return nil
 }
 
 // finishKeptLogin finishes the sign-in whose code login --email or an AI tool (login_start) sent and kept
 // here, with the code the user entered in a terminal, the app or the AI tool. An email without an account
 // is signed up only with signup; the error then carries the notice and the question to show first.
-func finishKeptLogin(dir string, c *client, lang, email, code string, signup, notify bool) (signInResult, error) {
-	s, ok, err := keptCode(dir, "login", email)
+func finishKeptLogin(dir string, c *client, lang, email, code string, signup, notify bool) (res signInResult, err error) {
+	err = finishKept(dir, "login", email, code, func(s codeStart) (err error) {
+		if !s.exists {
+			if !signup {
+				err := failure("signupConsent", email).(*failErr)
+				err.extra = map[string]string{"signupNotice": fmt.Sprintf(tr(lang, "signupNotice"), email), "notifyQuestion": tr(lang, "notifyAsk")}
+				return err
+			}
+			s.req["isNotified"] = notify // service notification opt-in, used for a new account only
+		}
+		res, err = c.finishSignIn(s, code)
+		return err
+	})
+	return res, err
+}
+
+// sayLoggedIn says the user is logged in, or that a new account was made and how to log in on the web.
+func sayLoggedIn(lang string, res signInResult) {
+	if res.Account.Created {
+		show(out, fmt.Sprintf(tr(lang, "signedUp"), res.Account.Email)+tr(lang, "passwordMail"))
+	} else {
+		say(lang, "loggedIn", res.Account.Email)
+	}
+}
+
+// finishKept tries code for the code kept for kind ("login", "email") and email by an earlier run or an AI
+// tool. A wrong code keeps it, as aline.team takes a few tries; the right one or the last try forgets it.
+func finishKept(dir, kind, email, code string, try func(codeStart) error) error {
+	s, ok, err := keptCode(dir, kind, email)
 	if err != nil {
-		return signInResult{}, err
+		return err
 	}
 	if !ok {
-		return signInResult{}, failure("codeNotSent", email)
+		return failure("codeNotSent", email)
 	}
 	if !validCode(code, s.length) {
-		return signInResult{}, failure("codeFormat", s.length)
+		return failure("codeFormat", s.length)
 	}
-	if !s.exists {
-		if !signup {
-			err := failure("signupConsent", email).(*failErr)
-			err.extra = map[string]string{"signupNotice": fmt.Sprintf(tr(lang, "signupNotice"), email), "notifyQuestion": tr(lang, "notifyAsk")}
-			return signInResult{}, err
-		}
-		s.req["isNotified"] = notify // service notification opt-in, used for a new account only
-	}
-	res, err := c.finishSignIn(s, code)
-	if err == nil || codeEnded(err) { // a wrong code keeps it: aline.team takes a few tries
-		if kerr := keepCode(dir, "login", email, nil); err == nil {
+	err = try(s)
+	if err == nil || codeEnded(err) {
+		if kerr := keepCode(dir, kind, email, nil); err == nil {
 			err = kerr
 		}
 	}
-	return res, err
+	return err
 }
 
 // revoke has aline.team revoke this device's token, and reports whether it did. send, not call: an
@@ -198,11 +213,7 @@ func (c *client) login(lang string) error {
 	if err != nil {
 		return err
 	}
-	if res.Account.Created {
-		show(out, fmt.Sprintf(tr(lang, "signedUp"), res.Account.Email)+tr(lang, "passwordMail"))
-	} else {
-		say(lang, "loggedIn", res.Account.Email)
-	}
+	sayLoggedIn(lang, res)
 	return nil
 }
 
