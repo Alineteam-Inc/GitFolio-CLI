@@ -484,10 +484,7 @@ func sendPending(dir string, dryRun bool) (n syncCounts, err error) {
 			default:
 				return errors.Join(err, save())
 			}
-			st.Stats[key] = statsPrint(s)
-			if err := save(); err != nil {
-				return err
-			}
+			st.Stats[key] = statsPrint(s) // saved with the rest; sent again after a crash, which changes nothing
 		}
 		return nil
 	}
