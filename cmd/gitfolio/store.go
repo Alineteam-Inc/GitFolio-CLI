@@ -336,8 +336,10 @@ func scanRepos(dir string, rs []*Repo, rebuild bool, each func(i, added int, err
 		reads[i] = make(chan repoRead, 1)
 	}
 	go sideBySide(len(rs), func(i int) { reads[i] <- readRepo(cfg, tags, had, rs[i], rebuild) })
+	// The reads run on while the first repositories are stored: storing adds to a copy of what is known.
+	storing := storedNow{known: maps.Clone(had.known), noBranch: had.noBranch}
 	for i, r := range rs {
-		n, err := storeScan(dir, cfg, r, <-reads[i], rebuild, registered)
+		n, err := storeScan(dir, cfg, r, <-reads[i], rebuild, registered, storing)
 		each(i, n, err)
 	}
 	return nil
@@ -438,7 +440,7 @@ func readCommitsOf(repo string, rng []string, files bool, tags map[string][]stri
 }
 
 // storeScan stores the user's commits that readRepo found and are not stored yet.
-func storeScan(dir string, cfg Config, r *Repo, g repoRead, rebuild bool, registered map[string]bool) (int, error) {
+func storeScan(dir string, cfg Config, r *Repo, g repoRead, rebuild bool, registered map[string]bool, had storedNow) (int, error) {
 	if g.move != nil {
 		if err := queueMove(dir, *g.move); err != nil {
 			return 0, err
@@ -456,23 +458,24 @@ func storeScan(dir string, cfg Config, r *Repo, g repoRead, rebuild bool, regist
 	if cfg.Deps { // module IDs only: package manager files are read by `deps scan`, not here
 		modules = manifestModules(*r)
 	}
-	stored, err := readCommits(dir)
-	if err != nil {
-		return 0, err
-	}
 	// Commits stored before branches or file paths were recorded are collected once more.
-	if r.Format < repoFormat || (rng[0] == "--remotes" && slices.ContainsFunc(stored, func(c Commit) bool { return c.Repo == r.ID && c.Branch == "" })) {
+	if r.Format < repoFormat || (rng[0] == "--remotes" && had.noBranch[r.ID]) {
 		rebuild = true
 	}
+	known := had.known // shared by the repositories of this scan, so a commit found again is stored once
 	if rebuild {
+		stored, err := readCommits(dir)
+		if err != nil {
+			return 0, err
+		}
 		stored = slices.DeleteFunc(stored, func(c Commit) bool { return c.Repo == r.ID })
 		if err := writeCommits(dir, stored); err != nil {
 			return 0, err
 		}
-	}
-	known := map[string]bool{}
-	for _, c := range stored {
-		known[c.Hash] = known[c.Hash] || registered[c.Repo]
+		clear(known)
+		for _, c := range stored {
+			known[c.Hash] = known[c.Hash] || registered[c.Repo]
+		}
 	}
 	var fresh []Commit
 	var hashes []string
