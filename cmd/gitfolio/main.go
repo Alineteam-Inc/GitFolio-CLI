@@ -871,7 +871,10 @@ func buildExport(dir string) (exportData, error) {
 			}
 			c.Files[i].Module = ""
 		}
-		r := byID[c.Repo]
+		r, ok := byID[c.Repo]
+		if !ok { // left behind by remove: of no registered repository, so nothing to send
+			continue
+		}
 		c.Repo, c.Provider, c.Namespace = r.Name, r.Provider, r.Namespace
 		out.Commits = append(out.Commits, c)
 	}

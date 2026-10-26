@@ -317,8 +317,24 @@ func scanRepos(dir string, rs []*Repo, rebuild bool, each func(i, added int, err
 	if err != nil {
 		return err
 	}
+	repos, err := loadRepos(dir)
+	if err != nil {
+		return err
+	}
+	// Commits count as stored only under a registered repository: what remove left behind of another
+	// copy (a moved folder added again) does not keep this one from collecting them.
+	registered := map[string]bool{}
+	for _, x := range repos {
+		registered[x.ID] = true
+	}
+	for _, r := range rs {
+		registered[r.ID] = true
+	}
 	had := storedNow{known: map[string]bool{}, noBranch: map[string]bool{}}
 	for _, c := range stored {
+		if !registered[c.Repo] {
+			continue
+		}
 		had.known[c.Hash] = true
 		if c.Branch == "" {
 			had.noBranch[c.Repo] = true
@@ -330,7 +346,7 @@ func scanRepos(dir string, rs []*Repo, rebuild bool, each func(i, added int, err
 	}
 	go sideBySide(len(rs), func(i int) { reads[i] <- readRepo(cfg, tags, had, rs[i], rebuild) })
 	for i, r := range rs {
-		n, err := storeScan(dir, cfg, r, <-reads[i], rebuild)
+		n, err := storeScan(dir, cfg, r, <-reads[i], rebuild, registered)
 		each(i, n, err)
 	}
 	return nil
@@ -431,7 +447,7 @@ func readCommitsOf(repo string, rng []string, files bool, tags map[string][]stri
 }
 
 // storeScan stores the user's commits that readRepo found and are not stored yet.
-func storeScan(dir string, cfg Config, r *Repo, g repoRead, rebuild bool) (int, error) {
+func storeScan(dir string, cfg Config, r *Repo, g repoRead, rebuild bool, registered map[string]bool) (int, error) {
 	if g.move != nil {
 		if err := queueMove(dir, *g.move); err != nil {
 			return 0, err
@@ -465,7 +481,7 @@ func storeScan(dir string, cfg Config, r *Repo, g repoRead, rebuild bool) (int, 
 	}
 	known := map[string]bool{}
 	for _, c := range stored {
-		known[c.Hash] = true
+		known[c.Hash] = known[c.Hash] || registered[c.Repo]
 	}
 	var fresh []Commit
 	var hashes []string

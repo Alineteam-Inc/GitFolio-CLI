@@ -480,3 +480,45 @@ func TestMissingFolderKeepsAddress(t *testing.T) {
 		t.Errorf("address after a scan of a missing folder: %q %q", r.Provider, r.Namespace)
 	}
 }
+
+// A repository moved to another folder and added again collects its commits again: what remove left
+// of the old copy is of no registered repository, so it neither hides them nor is exported.
+func TestMovedRepositoryCollectsAgain(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	dir, root := t.TempDir(), t.TempDir()
+	old, moved := filepath.Join(root, "old"), filepath.Join(root, "moved")
+	for _, args := range [][]string{{"init", "-q", "-b", "main", old}, {"-C", old, "-c", "user.email=me@example.com", "-c", "user.name=me",
+		"commit", "-q", "--allow-empty", "-m", "first"}} {
+		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	if err := saveConfig(dir, Config{Emails: []string{"me@example.com"}}); err != nil {
+		t.Fatal(err)
+	}
+	scan := func(path string) int {
+		t.Helper()
+		r := newRepo(path)
+		if err := saveRepos(dir, []Repo{r}); err != nil { // the only one registered: remove took the other
+			t.Fatal(err)
+		}
+		n, err := scanRepo(dir, &r, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if n := scan(old); n != 1 {
+		t.Fatalf("first scan: %d", n)
+	}
+	if err := os.Rename(old, moved); err != nil {
+		t.Fatal(err)
+	}
+	if n := scan(moved); n != 1 {
+		t.Errorf("collected after the move: %d", n)
+	}
+	if out, err := buildExport(dir); err != nil || len(out.Commits) != 1 {
+		t.Errorf("exported: %d commits, %v", len(out.Commits), err)
+	}
+}
