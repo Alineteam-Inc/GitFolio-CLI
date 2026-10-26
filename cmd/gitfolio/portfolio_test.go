@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -183,5 +184,27 @@ func TestPortfolio(t *testing.T) {
 	must(cmdPortfolio(dir, nil))
 	if _, err := os.Stat(filepath.Join(work, "portfolio.pdf")); err != nil || !strings.Contains(buf.String(), "Answer md or pdf") {
 		t.Errorf("asked for pdf: %v\n%s", err, buf.String())
+	}
+}
+
+// When aline.team cannot give the developer type, the portfolio goes without one: the type kept here may
+// be another account's, last year's or in another language.
+func TestPortfolioWithoutAnotherAccountsType(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "down", http.StatusServiceUnavailable) }))
+	defer ts.Close()
+	t.Setenv("GITFOLIO_API_URL", ts.URL)
+	t.Setenv("GITFOLIO_LANG", "en")
+	defer func(o, e io.Writer) { out, errOut = o, e }(out, errOut)
+	out, errOut = io.Discard, io.Discard
+	dir := t.TempDir()
+	if err := saveCredentials(dir, Credentials{Token: testToken, Email: "dev@example.com", Server: ts.URL}); err != nil {
+		t.Fatal(err)
+	}
+	other := devTypeCache{Year: time.Now().Year(), Account: "someone@else.example", Lang: "en", Detail: devType{Title: "ARCHITECT"}}
+	if err := saveJSON(filepath.Join(dir, devTypeFile), other); err != nil {
+		t.Fatal(err)
+	}
+	if md, err := portfolioOf(dir, "en", false); err != nil || strings.Contains(md, "ARCHITECT") {
+		t.Errorf("portfolio with aline.team down: %v\n%s", err, md)
 	}
 }

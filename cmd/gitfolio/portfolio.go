@@ -135,8 +135,9 @@ func portfolioOf(dir, lang string, ai bool) (string, error) {
 		repos = aiView(lang, repos)
 	}
 	d, _, err := devTypeNow(dir, lang, c, local)
-	if err != nil {
+	if err != nil { // what was kept may be another account's, last year's or in another language
 		warn(lang, "portfolioNoType", err)
+		d = devTypeCache{}
 	}
 	deps, err := loadDeps(dir)
 	if err != nil {
