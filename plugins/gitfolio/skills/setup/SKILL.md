@@ -40,7 +40,9 @@ ask, and never guess an email, a code or a repository.
      name), commit messages (off by default, subjects or full), branch names (off by default), or hidden.
    - Where the rules and the user's wish differ, tell the user and keep the stricter one unless they
      clearly choose otherwise.
-   - Apply with `set_ai_exposure`. File paths, folders and file names are never shown, whatever is set.
+   - Apply with `set_ai_exposure`, naming the repository by its path (as given to `add_repository`) or by
+     the name `ai_settings` shows: once it shows under another name or is hidden, its own name is not taken.
+     File paths, folders and file names are never shown, whatever is set.
 6. **Sync with aline.team?** GitFolio is in local mode by default: nothing goes out on its own, and it
    calls the aline.team API, with daily totals, only when the user looks up their type or portfolio. Ask whether they want automatic sync
    instead (the past commits right away, then after each git push, to keep their aline.team profile

@@ -216,6 +216,17 @@ func TestAIExposure(t *testing.T) {
 		"map[branches:on hidden:false messages:off name:real path:/work/internal-tool repository:internal-tool]]" {
 		t.Errorf("config ai --json: %v\n%s", err, got)
 	}
+	// AI tools name a repository as they see it, or by a path in it: its own name finds nothing once it
+	// shows under another name or is hidden, so it cannot tell what those are called.
+	if _, err := mcpSetExposure(dir, map[string]any{"repository": "secret-proj", "hidden": false}); err == nil {
+		t.Error("a hidden repository was found, and shown again, by its own name")
+	}
+	if _, err := mcpWork(dir, map[string]any{"repository": "acme-payments"}); err == nil {
+		t.Error("a renamed repository was found by its own name")
+	}
+	if _, err := mcpWork(dir, map[string]any{"repository": "Payments backend"}); err != nil {
+		t.Errorf("by the name AI tools see: %v", err)
+	}
 
 	in := strings.Join([]string{
 		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"set_ai_exposure","arguments":{"repository":"internal-tool","name":"anonymous","branches":false}}}`,

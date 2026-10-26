@@ -478,15 +478,17 @@ func aiView(lang string, repos []Repo) []Repo {
 	return view
 }
 
-// aiRepo finds the repository an AI tool means: by the name it sees, its own name or a path in it.
+// aiRepo finds the repository an AI tool means: by the name it sees, or by a path in it (where the tool
+// works). Never by its own name: that would tell what a hidden or renamed repository is called.
 func aiRepo(lang string, repos []Repo, arg string) (int, bool) {
 	for _, v := range aiView(lang, repos) {
 		if v.Name == arg {
 			return slices.IndexFunc(repos, func(r Repo) bool { return r.ID == v.ID }), true
 		}
 	}
-	r, ok := findRepo(repos, arg)
-	return slices.IndexFunc(repos, func(x Repo) bool { return x.ID == r.ID }), ok
+	top, err := topLevel(arg)
+	i := slices.IndexFunc(repos, func(r Repo) bool { return err == nil && r.Path == top })
+	return i, i >= 0
 }
 
 // setExposure changes one setting of what AI tools see of a repository: name (real, anonymous or
