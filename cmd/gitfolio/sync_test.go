@@ -685,3 +685,18 @@ func TestScanAfterUnshallow(t *testing.T) {
 		t.Errorf("after --unshallow: %d %v, want 2", n, err)
 	}
 }
+
+// A sync that finds the login gone (logout while it waited or scanned) stops and keeps what is queued:
+// it once took the empty account for another one and cleared the queued deletions and moves.
+func TestSyncLoggedOutKeepsQueue(t *testing.T) {
+	dir := t.TempDir()
+	if err := saveSync(dir, syncState{Account: "dev@example.com", Deletes: []deletion{{"GITHUB", "me/app"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sendPending(dir, false); errorCode(err) != "loginFirst" {
+		t.Errorf("sync logged out: %v", err)
+	}
+	if st, _ := loadSync(dir); st.Account != "dev@example.com" || len(st.Deletes) != 1 {
+		t.Errorf("queue after a logged-out sync: %+v", st)
+	}
+}

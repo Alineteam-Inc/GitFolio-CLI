@@ -383,6 +383,9 @@ func sendPending(dir string, dryRun bool) (n syncCounts, err error) {
 	if err != nil {
 		return n, err
 	}
+	if !c.loggedIn() { // logged out while this run waited or scanned: what is queued stays queued
+		return n, failure("loginFirst")
+	}
 	st, err := loadSync(dir)
 	if err != nil {
 		return n, err
