@@ -273,12 +273,7 @@ func mcpTimeline(dir string, args map[string]any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	type tally struct {
-		commits      int
-		repos        map[string]bool
-		langs, types map[string]int
-	}
-	months := map[string]*tally{}
+	commits, names := map[string][]Commit{}, map[string]map[string]bool{} // by month
 	for _, r := range repos {
 		for _, c := range byRepo[r.ID] {
 			t, err := time.Parse(time.RFC3339, c.Date)
@@ -286,25 +281,17 @@ func mcpTimeline(dir string, args map[string]any) (any, error) {
 				continue
 			}
 			k := t.Local().Format("2006-01")
-			m := months[k]
-			if m == nil {
-				m = &tally{repos: map[string]bool{}, langs: map[string]int{}, types: map[string]int{}}
-				months[k] = m
+			commits[k] = append(commits[k], c)
+			if names[k] == nil {
+				names[k] = map[string]bool{}
 			}
-			m.commits++
-			m.repos[r.Name] = true
-			m.types[cmp.Or(commitKinds[commitType(c.Message)], "other")]++
-			for _, f := range c.Files {
-				if l := languageOf(f.Name); l != "" {
-					m.langs[l] += f.Add + f.Del
-				}
-			}
+			names[k][r.Name] = true
 		}
 	}
 	list := []month{}
-	for _, k := range slices.Sorted(maps.Keys(months)) {
-		m := months[k]
-		list = append(list, month{k, m.commits, slices.Sorted(maps.Keys(m.repos)), shares(m.langs), shares(m.types)})
+	for _, k := range slices.Sorted(maps.Keys(commits)) {
+		s := summarize(commits[k], p, false) // counted as work counts them
+		list = append(list, month{k, s.Commits, slices.Sorted(maps.Keys(names[k])), s.Languages, s.CommitTypes})
 	}
 	return map[string]any{"months": list}, nil
 }

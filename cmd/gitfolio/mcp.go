@@ -625,11 +625,10 @@ func mcpAISettings(dir string, _ map[string]any) (any, error) {
 		Branches   string `json:"branches"`
 	}
 	view, list := aiView(lang, repos), []setting{}
-	for _, v := range view {
-		r := repos[slices.IndexFunc(repos, func(x Repo) bool { return x.ID == v.ID })]
-		name := map[string]string{"": "real", anonymousName: "anonymous"}[r.AI.Name]
-		list = append(list, setting{v.Name, cmp.Or(name, "alias"), cmp.Or(r.AI.Messages, "off"),
-			map[bool]string{true: "on", false: "off"}[r.AI.Branches]})
+	for _, v := range view { // aiView changes the name, not the settings
+		name := map[string]string{"": "real", anonymousName: "anonymous"}[v.AI.Name]
+		list = append(list, setting{v.Name, cmp.Or(name, "alias"), cmp.Or(v.AI.Messages, "off"),
+			map[bool]string{true: "on", false: "off"}[v.AI.Branches]})
 	}
 	return map[string]any{"repositories": list, "hidden": len(repos) - len(view)}, nil
 }

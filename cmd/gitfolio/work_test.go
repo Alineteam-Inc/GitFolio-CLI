@@ -114,6 +114,11 @@ func TestWorkTools(t *testing.T) {
 	if !strings.Contains(text[3], `"month":"2025-06"`) || !strings.Contains(text[3], `"month":"2025-07","commits":1,"repositories":["app"]`) {
 		t.Errorf("timeline = %s", text[3])
 	}
+	want := `{"months":[{"month":"2025-06","commits":1,"repositories":["app"],"languagesPercentOfChangedLines":{"Go":100},"commitTypesPercent":{"feature":100}},` +
+		`{"month":"2025-07","commits":1,"repositories":["app"],"commitTypesPercent":{"fix":100}}]}`
+	if text[3] != want {
+		t.Errorf("timeline = %s\nwant %s", text[3], want)
+	}
 	if !isErr[4] || !isErr[5] {
 		t.Errorf("hidden repository or bad period answered: %s / %s", text[4], text[5])
 	}
