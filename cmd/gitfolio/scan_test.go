@@ -466,3 +466,17 @@ func TestLaterSettingsKept(t *testing.T) {
 		t.Errorf("saved: ai %+v", again[0].AI)
 	}
 }
+
+// A repository whose folder is gone (deleted, or on a drive not plugged in) keeps its address, so that
+// remove --purge can still have aline.team delete what it holds.
+func TestMissingFolderKeepsAddress(t *testing.T) {
+	dir := t.TempDir()
+	if err := saveConfig(dir, Config{Emails: []string{"me@example.com"}}); err != nil {
+		t.Fatal(err)
+	}
+	r := &Repo{ID: "a", Name: "app", Path: filepath.Join(t.TempDir(), "gone"), Provider: "GITHUB", Namespace: "me/app"}
+	_, _ = scanRepo(dir, r, false)
+	if r.Provider != "GITHUB" || r.Namespace != "me/app" {
+		t.Errorf("address after a scan of a missing folder: %q %q", r.Provider, r.Namespace)
+	}
+}

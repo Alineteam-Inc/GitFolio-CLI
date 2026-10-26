@@ -376,7 +376,9 @@ func readRepo(cfg Config, tags map[string][]string, had storedNow, r *Repo, rebu
 	}
 	r.Name = filepath.Base(r.Path)
 	was := deletion{r.Provider, r.Namespace}
-	r.Provider, r.Namespace = remote(r.Path)
+	if _, err := os.Stat(r.Path); err == nil { // a folder that is gone keeps its last address, for remove --purge
+		r.Provider, r.Namespace = remote(r.Path)
+	}
 	// A new address of the same repository (git remote set-url, or its push URL now counts): aline.team
 	// renames what it has rather than get the commits again under the new name.
 	if now := (deletion{r.Provider, r.Namespace}); was.Namespace != "" && now.Namespace != "" && now != was {
