@@ -141,7 +141,7 @@ func TestCommitsTool(t *testing.T) {
 		{ID: "b", Name: "lib", AI: aiExposure{Messages: "subjects", Branches: true}},
 		{ID: "c", Name: "work"},
 	}))
-	msg := "feat: invoices for teams\n\nSplit totals per seat; ask kim@corp.example for the rates.\n\nCo-authored-by: Kim <kim@corp.example>\nSigned-off-by: Me <me@example.com>"
+	msg := "feat: invoices for teams\n\nSplit totals per seat; ask kim@corp.example for the rates.\nThis reverts commit 0123456789abcdef0123456789abcdef01234567.\n\nCo-authored-by: Kim <kim@corp.example>\nSigned-off-by: Me <me@example.com>"
 	var commits []Commit
 	for i, r := range []string{"a", "a", "a", "b", "c"} {
 		commits = append(commits, Commit{Repo: r, Hash: fmt.Sprint("h", i), Date: fmt.Sprintf("2025-06-%02dT12:00:00Z", 10+i),
@@ -164,7 +164,7 @@ func TestCommitsTool(t *testing.T) {
 	b, _ := json.Marshal(full)
 	s := string(b)
 	if full["total"] != float64(3) || full["nextOffset"] != float64(2) || !strings.Contains(s, `"date":"2025-06-12"`) || !strings.Contains(s, `"type":"feature","workKinds":["source","test"]`) || !strings.Contains(s, `"linesAdded":7`) ||
-		!strings.Contains(s, `"body":"Split totals per seat; ask [email] for the rates."`) || strings.Contains(s, "Co-authored") ||
+		!strings.Contains(s, `"body":"Split totals per seat; ask [email] for the rates.\nThis reverts commit [hash]."`) || strings.Contains(s, "Co-authored") ||
 		strings.Contains(s, "Signed-off") || strings.Contains(s, "@") || strings.Contains(s, "h0") || strings.Contains(s, "billing") || strings.Contains(s, "feature/x") {
 		t.Errorf("full messages = %s", s)
 	}

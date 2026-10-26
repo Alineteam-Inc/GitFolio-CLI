@@ -312,10 +312,12 @@ func mcpTimeline(dir string, args map[string]any) (any, error) {
 var (
 	trailerLine = regexp.MustCompile(`(?i)^(co-authored-by|signed-off-by|reviewed-by|acked-by|tested-by|reported-by|cc|change-id):`)
 	emailLike   = regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}`)
+	hashLike    = regexp.MustCompile(`\b[0-9a-f]{40}(?:[0-9a-f]{24})?\b`) // what git revert and cherry-pick -x write
 )
 
 // messageParts is a stored (already masked) commit message as AI tools may see it: the subject, and
-// the body without trailers (who co-wrote or signed off) and without anything that looks like an email.
+// the body without trailers (who co-wrote or signed off) and without anything that looks like an email
+// or a full commit hash.
 func messageParts(msg string) (subject, body string) {
 	subject, rest, _ := strings.Cut(strings.TrimSpace(msg), "\n")
 	var keep []string
@@ -324,7 +326,9 @@ func messageParts(msg string) (subject, body string) {
 			keep = append(keep, l)
 		}
 	}
-	clean := func(s string) string { return emailLike.ReplaceAllString(strings.TrimSpace(s), "[email]") }
+	clean := func(s string) string {
+		return hashLike.ReplaceAllString(emailLike.ReplaceAllString(strings.TrimSpace(s), "[email]"), "[hash]")
+	}
 	return clean(subject), clean(strings.Join(keep, "\n"))
 }
 
