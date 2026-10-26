@@ -127,6 +127,8 @@ type Config struct {
 	// LocalModeKnown is set once the user chose the sync mode (init, config autosync) or, with autosync
 	// off from before 0.6.0, was told once that it is now local mode.
 	LocalModeKnown bool `json:"localModeKnown,omitempty"`
+	// MaskVersion is the maskVersion the stored messages were masked with.
+	MaskVersion int `json:"maskVersion,omitempty"`
 }
 
 func loadRepos(dir string) (repos []Repo, err error) {
@@ -297,6 +299,15 @@ func scanRepos(dir string, rs []*Repo, rebuild bool, each func(i, added int, err
 	cfg, err := loadConfig(dir)
 	if err != nil {
 		return err
+	}
+	if cfg.MaskVersion < maskVersion { // stricter masking reaches the messages stored before
+		if _, err := maskStored(dir, newMasker(cfg.Mask)); err != nil {
+			return err
+		}
+		cfg.MaskVersion = maskVersion
+		if err := saveConfig(dir, cfg); err != nil {
+			return err
+		}
 	}
 	tags, err := readAgentTags(dir)
 	if err != nil {

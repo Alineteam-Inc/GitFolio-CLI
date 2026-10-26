@@ -1009,16 +1009,22 @@ func changeConfig(dir string, args []string) error {
 
 // remask applies m to the stored commit messages, so a newly blocked word disappears from past data too.
 func remask(dir string, m masker) error {
-	commits, err := readCommits(dir)
+	n, err := maskStored(dir, m)
 	if err != nil {
 		return err
+	}
+	say(detectLang(os.Getenv), "maskApplied", n)
+	return nil
+}
+
+// maskStored applies m to the stored commit messages and says how many there are. Callers hold the data lock.
+func maskStored(dir string, m masker) (int, error) {
+	commits, err := readCommits(dir)
+	if err != nil {
+		return 0, err
 	}
 	for i := range commits {
 		m.commit(&commits[i])
 	}
-	if err := writeCommits(dir, commits); err != nil {
-		return err
-	}
-	say(detectLang(os.Getenv), "maskApplied", len(commits))
-	return nil
+	return len(commits), writeCommits(dir, commits)
 }

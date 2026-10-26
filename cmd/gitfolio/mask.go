@@ -13,8 +13,11 @@ var maskRules = []struct {
 	re   *regexp.Regexp
 	repl string
 }{
-	{regexp.MustCompile(`-----BEGIN [A-Z ]*PRIVATE KEY-----`), "[SECRET]"},
-	{regexp.MustCompile(`\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_\w{20,}|sk-[\w-]{20,}|AKIA[0-9A-Z]{16}|xox[abprs]-[\w-]{10,}|eyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,})`), "[SECRET]"},
+	// A private key goes whole, to its END line or the end of the message; masking before maskVersion 1
+	// replaced only its BEGIN line, so what that left of one goes too.
+	{regexp.MustCompile(`(?s)-----BEGIN [A-Z ]*PRIVATE KEY[A-Z ]*-----.*?(?:-----END [A-Z ]*PRIVATE KEY[A-Z ]*-----|\z)`), "[SECRET]"},
+	{regexp.MustCompile(`(?s)\[SECRET\][^\[]*?-----END [A-Z ]*PRIVATE KEY[A-Z ]*-----`), "[SECRET]"},
+	{regexp.MustCompile(`\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_\w{20,}|glpat-[\w-]{20,}|npm_[A-Za-z0-9]{36}|AIza[\w-]{35}|[rs]k_live_[A-Za-z0-9]{20,}|sk-[\w-]{20,}|AKIA[0-9A-Z]{16}|xox[abprs]-[\w-]{10,}|eyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,})`), "[SECRET]"},
 	{regexp.MustCompile(`\baln_cli_[A-Za-z0-9_-]{20,}`), "[SECRET]"}, // aline.team CLI token
 	{regexp.MustCompile(`(?i)\b(?:https?|ssh|git|ftp)://[^\s<>()\[\]"']+|\bwww\.[^\s<>()\[\]"']+`), "[URL]"},
 	{regexp.MustCompile(`[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+`), "[EMAIL]"},
@@ -30,6 +33,10 @@ var notTickets = map[string]bool{
 	"UTF": true, "SHA": true, "ISO": true, "RFC": true, "HTTP": true, "TLS": true, "SSL": true, "ES": true,
 	"MD": true, "AES": true, "RSA": true, "CVE": true, "PEP": true, "JSR": true, "ECMA": true, "GPT": true, "IPV": true,
 }
+
+// maskVersion counts the changes to maskRules that must reach what was stored before: when it grows, the
+// stored messages are masked again once (scanRepos), and the next sync sends the ones that changed.
+const maskVersion = 1
 
 // masker hides sensitive values before anything is stored or sent (DESIGN 4).
 type masker struct{ words *regexp.Regexp }
