@@ -35,8 +35,6 @@ type Repo struct {
 	// Manifests records the user's decision per package manager file path: true = may be read.
 	// Local only, never exported or sent. Files missing here wait for approval.
 	Manifests map[string]bool `json:"manifests,omitempty"`
-	// NoHooks: the user chose no git hooks (init); its pushes go by sync or the daily sync.
-	NoHooks bool `json:"noHooks,omitempty"`
 	// AI is what AI coding tools may see of this repository through gitfolio mcp (config ai).
 	// Local only, never sent.
 	AI aiExposure `json:"ai,omitzero"`
@@ -354,7 +352,7 @@ func readRepo(cfg Config, tags map[string][]string, had storedNow, r *Repo, rebu
 	if g.mine, g.err = myEmails(r.Path, cfg.Emails); g.err != nil {
 		return g
 	}
-	if hooks, husky, err := hooksDir(r.Path); err == nil && husky && !r.NoHooks {
+	if hooks, husky, err := hooksDir(r.Path); err == nil && husky {
 		_ = huskyHooks(hooks, true) // husky rewrites its hook files on npm install; put gitfolio's lines back
 	}
 	r.Name = filepath.Base(r.Path)

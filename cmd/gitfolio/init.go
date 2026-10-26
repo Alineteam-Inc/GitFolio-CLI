@@ -132,9 +132,9 @@ func cmdInit(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	hooks, ai := true, aiExposure{}
+	ai := aiExposure{}
 	if len(chosen) > 0 && interactive() {
-		hooks, ai = askRepoChoices(lang)
+		ai = askRepoChoices(lang)
 	}
 
 	// Settings. Syncing automatically sends right after git push (config autosync) and, when scheduled,
@@ -175,7 +175,7 @@ func cmdInit(dir string, args []string) error {
 	widest := 0
 	for i, p := range chosen {
 		rs[i] = newRepo(p)
-		rs[i].NoHooks, rs[i].AI = !hooks, ai
+		rs[i].AI = ai
 		widest = max(widest, width(rs[i].Name))
 	}
 	if deps && interactive() {
@@ -484,20 +484,19 @@ func askYesNo(lang, key string, def bool, args ...any) bool {
 	}
 }
 
-// askRepoChoices asks, once for all the chosen repositories, what the user must decide for them: git
-// hooks, and what AI coding tools see. Each defaults to the usual answer; config ai and remove change
-// them later, per repository.
-func askRepoChoices(lang string) (hooks bool, ai aiExposure) {
-	hooks = askYesNo(lang, "hooksAsk", true)
+// askRepoChoices says that the chosen repositories get git hooks, then asks once for all of them what AI
+// coding tools see. Each answer defaults to the usual one; config ai changes it later, per repository.
+func askRepoChoices(lang string) (ai aiExposure) {
+	notice(tr(lang, "hooksNotice"))
 	switch askChoice(lang, "aiNameAsk", 3, 0) {
 	case 1:
 		ai.Name = anonymousName
 	case 2:
-		return hooks, aiExposure{Hidden: true}
+		return aiExposure{Hidden: true}
 	}
 	detail := askChoice(lang, "aiDetailAsk", 3, 0)
 	ai.Messages, ai.Branches = []string{"", "subjects", "full"}[detail], detail > 0
-	return hooks, ai
+	return ai
 }
 
 // askChoice asks to pick one of n numbered answers in key's text; Enter keeps def (0-based).

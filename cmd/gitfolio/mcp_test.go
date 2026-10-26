@@ -324,16 +324,13 @@ func TestMCPSetup(t *testing.T) {
 	if again, _ := call("login_start", map[string]any{"email": "dev@example.com", "agreed": true}); again["loggedIn"] != true {
 		t.Errorf("logging in again = %v", again)
 	}
-	a, err := call("add_repository", map[string]any{"path": repo, "hooks": false})
+	a, err := call("add_repository", map[string]any{"path": repo})
 	if err != nil || a["repository"] != filepath.Base(repo) || !strings.Contains(fmt.Sprint(a["next"]), "set_ai_exposure") ||
-		!strings.HasPrefix(fmt.Sprint(a["hooksInstalled"]), "none") {
+		!strings.HasPrefix(fmt.Sprint(a["hooksInstalled"]), "post-commit and pre-push") {
 		t.Errorf("add_repository = %v, %v", a, err)
 	}
-	if hookStatus(repo) == "on" {
-		t.Error("hooks were installed though the user said no")
-	}
-	if repos, _ := loadRepos(dir); len(repos) != 1 || !repos[0].NoHooks {
-		t.Errorf("no hooks not kept: %+v", repos)
+	if hookStatus(repo) != "on" {
+		t.Error("hooks were not installed")
 	}
 	if _, err := call("set_sync_mode", map[string]any{"mode": "off"}); err == nil {
 		t.Error("an unknown sync mode was taken")

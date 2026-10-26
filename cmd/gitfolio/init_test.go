@@ -222,24 +222,25 @@ func TestProgress(t *testing.T) {
 	}
 }
 
-// init asks once what the chosen repositories get: git hooks, and what AI coding tools see of them.
+// init says the chosen repositories get git hooks, then asks once what AI coding tools see of them.
 func TestAskRepoChoices(t *testing.T) {
 	t.Setenv("GITFOLIO_LANG", "en")
+	var buf bytes.Buffer
 	defer func(r *bufio.Reader, o io.Writer) { stdin, out = r, o }(stdin, out)
-	out = io.Discard
-	for answers, want := range map[string]struct {
-		hooks bool
-		ai    aiExposure
-	}{
-		"\n\n\n":              {true, aiExposure{}}, // Enter: hooks, real name, nothing more
-		"n\n2\n2\n":           {false, aiExposure{Name: anonymousName, Messages: "subjects", Branches: true}},
-		"y\n3\n":              {true, aiExposure{Hidden: true}},                     // hidden: nothing more asked
-		"maybe\ny\n9\n1\n3\n": {true, aiExposure{Messages: "full", Branches: true}}, // asked again after a wrong answer
+	out = &buf
+	for answers, want := range map[string]aiExposure{
+		"\n\n":      {}, // Enter: real name, nothing more
+		"2\n2\n":    {Name: anonymousName, Messages: "subjects", Branches: true},
+		"3\n":       {Hidden: true},                     // hidden: nothing more asked
+		"9\n1\n3\n": {Messages: "full", Branches: true}, // asked again after a wrong answer
 	} {
 		stdinClosed, stdin = false, bufio.NewReader(strings.NewReader(answers))
-		if hooks, ai := askRepoChoices("en"); hooks != want.hooks || ai != want.ai {
-			t.Errorf("answers %q: hooks %v, ai %+v; want %v, %+v", answers, hooks, ai, want.hooks, want.ai)
+		if ai := askRepoChoices("en"); ai != want {
+			t.Errorf("answers %q: ai %+v; want %+v", answers, ai, want)
 		}
+	}
+	if !strings.Contains(buf.String(), "nothing is added to the repository or its remote") {
+		t.Errorf("hooks not told:\n%s", buf.String())
 	}
 }
 
@@ -309,7 +310,7 @@ func TestSetupJSON(t *testing.T) {
 	}
 
 	if v := must(run(cmdInit, "--policy")); !strings.Contains(fmt.Sprint(v["policy"]), "Source code is never collected") ||
-		!strings.Contains(fmt.Sprint(v["setupActions"]), "removing the repository from GitFolio") {
+		!strings.Contains(fmt.Sprint(v["setupActions"]), "in this computer's .git folder only") {
 		t.Errorf("policy: %v", v)
 	}
 	if _, err := run(cmdInit, "--scan", "--root", root); errorCode(err) != "loginFirst" {

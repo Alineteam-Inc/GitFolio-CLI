@@ -271,9 +271,10 @@ var appMessages = map[string]map[string]string{
  - Logs in to aline.team; an email without an account gets a new one
    (agreeing to the terms of service and the privacy policy).
  - Installs git hooks (post-commit, pre-push) in the repositories you
-   choose, unless you choose none. Hooks you already have still run
-   first; removing the repository from GitFolio puts them back as they
-   were.
+   choose, in this computer's .git folder only: nothing is added to the
+   repository or its remote. They never stop a commit or push, hooks you
+   already have still run first, and removing the repository from
+   GitFolio puts them back as they were.
  - Keeps the collected commit information on this computer: %s
  - Automatic sync sends the past commits of the chosen repositories right
    away, then after every git push. Local mode sends nothing on its
@@ -289,9 +290,10 @@ var appMessages = map[string]map[string]string{
 		"ko": ` [GitFolio를 시작하면 하는 일]
  - aline.team에 로그인합니다. 계정이 없는 이메일이면 새 계정을 만듭니다
    (이용약관·개인정보처리방침 동의).
- - 고른 저장소에 git 훅(post-commit·pre-push)을 설치합니다(설치하지 않기를
-   고르면 설치하지 않음). 원래 있던 훅은 그대로 먼저 실행되고, GitFolio에서
-   저장소를 빼면 원래대로 돌립니다.
+ - 고른 저장소에 git 훅(post-commit·pre-push)을 이 컴퓨터의 .git 폴더에만
+   설치합니다. 저장소와 원격 저장소에는 아무것도 추가되지 않습니다.
+   commit·push를 막지 않고, 원래 있던 훅은 그대로 먼저 실행되며,
+   GitFolio에서 저장소를 빼면 원래대로 돌립니다.
  - 수집한 커밋 정보를 이 컴퓨터에 저장합니다: %s
  - 자동 동기화는 고른 저장소의 지난 커밋 기록을 바로 보내고, 이후 git push
    때마다 보냅니다. 로컬 모드는 평소에는 보내지 않고, 볼 때만 aline.team
@@ -305,9 +307,11 @@ var appMessages = map[string]map[string]string{
 		"ja": ` [GitFolio を始めると行うこと]
  - aline.team にログインします。アカウントのないメールアドレスなら
    新しいアカウントを作ります(利用規約・プライバシーポリシーに同意)。
- - 選んだリポジトリに git フック(post-commit・pre-push)をインストール
-   します(インストールしないを選んだ場合は除く)。既存のフックはそのまま
-   先に実行され、GitFolio からリポジトリを外すと元に戻ります。
+ - 選んだリポジトリに git フック(post-commit・pre-push)を、この
+   コンピュータの .git フォルダにだけインストールします。リポジトリや
+   リモートには何も追加されません。commit・push を止めることはなく、
+   既存のフックはそのまま先に実行され、GitFolio からリポジトリを外すと
+   元に戻ります。
  - 収集したコミット情報をこのコンピュータに保存します: %s
  - 自動同期は、選んだリポジトリの過去のコミット記録をすぐに送り、
    以後 git push のたびに送ります。ローカルモードは普段は送らず、
@@ -568,10 +572,10 @@ var messages = map[string]map[string]string{
 		"ko": "아무것도 설정하지 않았습니다. 준비되면 `gitfolio init`을 다시 실행하세요.\n",
 		"ja": "何も設定していません。準備ができたら `gitfolio init` を再実行してください。\n",
 	},
-	"hooksAsk": {
-		"en": "Install git hooks (post-commit, pre-push) in the chosen repositories?\nHooks already there still run first, and `gitfolio remove` puts them back. Without them, pushes are not\nsent right away (`gitfolio sync` or the daily sync sends them) and AI tools used at commit time go unnoticed.",
-		"ko": "고른 저장소에 git 훅(post-commit·pre-push)을 설치할까요?\n원래 있던 훅은 그대로 먼저 실행되고, `gitfolio remove`로 원래대로 돌립니다. 설치하지 않으면 push 직후에\n보내지 않고(`gitfolio sync`나 매일 동기화로 보냄), 커밋할 때 쓴 AI 도구도 기록하지 못합니다.",
-		"ja": "選んだリポジトリに git フック(post-commit・pre-push)をインストールしますか?\n既存のフックはそのまま先に実行され、`gitfolio remove` で元に戻ります。インストールしない場合は push 直後に\n送信せず(`gitfolio sync` か毎日の同期で送信)、コミット時に使った AI ツールも記録できません。",
+	"hooksNotice": {
+		"en": "GitFolio adds git hooks (post-commit, pre-push) to the chosen repositories: they note the AI tools used at commit\ntime and collect each push (and send it, with automatic sync). They stay in this computer's .git folder (with husky,\nin .husky/_, which git ignores): nothing is added to the repository or its remote, and nobody else is affected.\nThey never stop a commit or push, hooks already there still run first, and `gitfolio remove` puts them back.\n",
+		"ko": "고른 저장소에 git 훅(post-commit·pre-push)을 추가합니다. 커밋할 때 쓴 AI 도구를 기록하고 push한 커밋을\n수집합니다(자동 동기화라면 바로 보냄). 훅은 이 컴퓨터의 .git 폴더(husky는 git이 무시하는 .husky/_)에만 들어가,\n저장소와 원격 저장소에는 아무것도 추가되지 않고 다른 사람에게도 영향이 없습니다.\ncommit·push를 막지 않고, 원래 있던 훅은 그대로 먼저 실행되며, `gitfolio remove`로 원래대로 돌립니다.\n",
+		"ja": "選んだリポジトリに git フック(post-commit・pre-push)を追加します。コミット時に使った AI ツールを記録し、\npush したコミットを収集します(自動同期ならすぐ送信)。フックはこのコンピュータの .git フォルダ(husky では git が\n無視する .husky/_)にだけ入り、リポジトリやリモートには何も追加されず、他の人にも影響しません。\ncommit・push を止めることはなく、既存のフックはそのまま先に実行され、`gitfolio remove` で元に戻ります。\n",
 	},
 	"aiNameAsk": {
 		"en": "How should AI coding tools (Claude Code, Codex: gitfolio mcp) see the chosen repositories?\n1) by their real names  2) anonymous (\"Repository 1\")  3) not at all\nFile paths are never shown; set each repository later with `gitfolio config ai`.",
@@ -593,8 +597,9 @@ var messages = map[string]map[string]string{
  - Logs in to aline.team; an email without an account gets a new one
    (agreeing to the terms of service and the privacy policy).
  - Installs git hooks (post-commit, pre-push) in the repositories you
-   choose. Hooks you already have still run first; gitfolio remove
-   puts them back as they were.
+   choose, in this computer's .git folder only: nothing is added to the
+   repository or its remote. They never stop a commit or push, hooks you
+   already have still run first, and gitfolio remove puts them back.
  - Keeps the collected commit information on this computer: %s
  - Automatic sync sends the past commits of the chosen repositories right
    away, then after every git push. Local mode sends nothing on its
@@ -610,8 +615,10 @@ var messages = map[string]map[string]string{
 		"ko": ` [GitFolio를 시작하면 하는 일]
  - aline.team에 로그인합니다. 계정이 없는 이메일이면 새 계정을 만듭니다
    (이용약관·개인정보처리방침 동의).
- - 고른 저장소에 git 훅(post-commit·pre-push)을 설치합니다. 원래 있던
-   훅은 그대로 먼저 실행되고, gitfolio remove로 원래대로 돌립니다.
+ - 고른 저장소에 git 훅(post-commit·pre-push)을 이 컴퓨터의 .git 폴더에만
+   설치합니다. 저장소와 원격 저장소에는 아무것도 추가되지 않습니다.
+   commit·push를 막지 않고, 원래 있던 훅은 그대로 먼저 실행되며,
+   gitfolio remove로 원래대로 돌립니다.
  - 수집한 커밋 정보를 이 컴퓨터에 저장합니다: %s
  - 자동 동기화는 고른 저장소의 지난 커밋 기록을 바로 보내고, 이후 git push
    때마다 보냅니다. 로컬 모드는 평소에는 보내지 않고, 볼 때만 aline.team
@@ -626,9 +633,10 @@ var messages = map[string]map[string]string{
 		"ja": ` [GitFolio を始めると行うこと]
  - aline.team にログインします。アカウントのないメールアドレスなら
    新しいアカウントを作ります(利用規約・プライバシーポリシーに同意)。
- - 選んだリポジトリに git フック(post-commit・pre-push)をインストール
-   します。既存のフックはそのまま先に実行され、gitfolio remove で元に
-   戻ります。
+ - 選んだリポジトリに git フック(post-commit・pre-push)を、この
+   コンピュータの .git フォルダにだけインストールします。リポジトリや
+   リモートには何も追加されません。commit・push を止めることはなく、
+   既存のフックはそのまま先に実行され、gitfolio remove で元に戻ります。
  - 収集したコミット情報をこのコンピュータに保存します: %s
  - 自動同期は、選んだリポジトリの過去のコミット記録をすぐに送り、
    以後 git push のたびに送ります。ローカルモードは普段は送らず、

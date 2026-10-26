@@ -24,11 +24,11 @@ ask, and never guess an email, a code or a repository.
 3. **Email (required).** Ask for the email to use. You may mention the git email of this repository, but
    the user decides. Ask whether they want aline.team service emails (no unless they say yes). Call
    `login_start` with `agreed: true`, then ask for the code from the email and call `login_verify`.
-4. **Repositories.** Ask which repositories to register (suggest the current one), and whether to install
-   git hooks in them (post-commit, pre-push; hooks they have still run first, `gitfolio remove` undoes it;
-   without them pushes are sent only by `gitfolio sync` or the daily sync). Call `add_repository` for
-   each with their answer in `hooks`. If a repository's git email is not the account's, offer `email_start` and `email_verify`:
-   aline.team takes commits only under verified emails.
+4. **Repositories.** Ask which repositories to register (suggest the current one). Tell them each gets git
+   hooks (post-commit, pre-push) in this computer's `.git` folder only: nothing is added to the repository
+   or its remote, they never stop a commit or push, hooks they have still run first, and `gitfolio remove`
+   undoes it. Call `add_repository` for each. If a repository's git email is not the account's, offer
+   `email_start` and `email_verify`: aline.team takes commits only under verified emails.
 5. **What AI tools may see**, for each repository:
    - First read the codebase's own rules: `CLAUDE.md`, `AGENTS.md`, `.cursor/rules`, `CONTRIBUTING`,
      security or confidentiality notes. Note anything about company or customer names, confidential
