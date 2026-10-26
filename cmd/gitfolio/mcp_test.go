@@ -304,31 +304,30 @@ func TestMCPSetup(t *testing.T) {
 		!strings.Contains(fmt.Sprint(p["setupActions"]), "git hooks (post-commit, pre-push)") {
 		t.Errorf("policy = %v", p)
 	}
-	for _, name := range []string{"login_verify", "email_verify"} {
-		if slices.ContainsFunc(mcpTools, func(x mcpTool) bool { return x.Name == name }) {
-			t.Errorf("%s takes a code in the conversation", name)
-		}
+	if slices.ContainsFunc(mcpTools, func(x mcpTool) bool { return x.Name == "email_verify" }) {
+		t.Error("email_verify takes a code in the conversation")
 	}
 	s, err := call("login_start", map[string]any{"email": "Dev@Example.com", "agreed": true})
 	enter, _ := s["enterCode"].(map[string]any)
-	if err != nil || s["newAccount"] != true || s["codeDigits"] != float64(6) ||
-		!strings.HasPrefix(fmt.Sprint(enter["terminal"]), "gitfolio login --email dev@example.com --code <code> --signup") {
+	if err != nil || s["newAccount"] != true || s["codeDigits"] != float64(6) || enter["here"] != "login_verify" ||
+		!strings.HasPrefix(fmt.Sprint(enter["terminal"]), "gitfolio login --email dev@example.com --code <code> --signup") ||
+		!strings.Contains(fmt.Sprint(s["signupNotice"]), "dev@example.com") {
 		t.Fatalf("login_start = %v, %v", s, err)
 	}
-	// The app or a terminal finishes it with the code, as login --code does after login --email; a new
-	// account first gets what the sending run would have shown, and the code stays.
-	_, err = jsonStdout(t, func() error {
-		return cmdLogin(dir, []string{"--email", "dev@example.com", "--code", "123456", "--json"})
-	})
-	if e := errorJSON(err); e["code"] != "signupConsent" || !strings.Contains(e["signupNotice"], "dev@example.com") || e["notifyQuestion"] == "" {
-		t.Errorf("login --code without --signup = %v", e)
+	if _, err := call("login_verify", map[string]any{"email": "dev@example.com", "code": "12345"}); errorCode(err) != "codeFormat" {
+		t.Errorf("short code: %v", err)
 	}
-	v, err := jsonStdout(t, func() error {
-		return cmdLogin(dir, []string{"--email", "dev@example.com", "--code", "123456", "--signup", "--notify", "--json"})
-	})
-	jsonOut = false
-	if err != nil || v["created"] != true || f.notified == nil || !*f.notified {
-		t.Fatalf("login --code after login_start = %v, %v (notifications %v)", v, err, f.notified)
+	if _, err := call("login_verify", map[string]any{"email": "dev@example.com", "code": "000000", "signup": true}); err == nil ||
+		!strings.Contains(err.Error(), "wrong code") {
+		t.Errorf("wrong code: %v", err)
+	}
+	if _, err := call("login_verify", map[string]any{"email": "dev@example.com", "code": "123456"}); err == nil ||
+		!strings.Contains(err.Error(), "Terms of Service") {
+		t.Errorf("a new account without agreeing: %v", err)
+	}
+	v, err := call("login_verify", map[string]any{"email": "dev@example.com", "code": "123456", "signup": true, "notifications": true})
+	if err != nil || v["loggedIn"] != true || v["newAccount"] != true || v["webLogin"] == nil || f.notified == nil || !*f.notified {
+		t.Fatalf("login_verify = %v, %v (notifications %v)", v, err, f.notified)
 	}
 	if again, _ := call("login_start", map[string]any{"email": "dev@example.com", "agreed": true}); again["loggedIn"] != true {
 		t.Errorf("logging in again = %v", again)
@@ -368,6 +367,34 @@ func TestMCPSetup(t *testing.T) {
 	}
 	if cfg, _ := loadConfig(dir); !slices.Contains(cfg.Emails, "work@example.com") {
 		t.Errorf("work email not kept: %v", cfg.Emails)
+	}
+}
+
+// A code an AI tool sent (login_start) is entered in the app or a terminal just as well: login --code
+// finishes it, and a new account first gets what the sending run would have shown, the code kept.
+func TestLoginCodeFromAITool(t *testing.T) {
+	f := &fakeAline{}
+	ts := httptest.NewServer(f.handler())
+	defer ts.Close()
+	t.Setenv("GITFOLIO_API_URL", ts.URL)
+	t.Setenv("GITFOLIO_LANG", "en")
+	defer func(o io.Writer) { out, jsonOut = o, false }(out)
+	out = io.Discard
+	dir := t.TempDir()
+	if _, err := mcpLoginStart(dir, map[string]any{"email": "dev@example.com", "agreed": true}); err != nil {
+		t.Fatal(err)
+	}
+	_, err := jsonStdout(t, func() error {
+		return cmdLogin(dir, []string{"--email", "dev@example.com", "--code", "123456", "--json"})
+	})
+	if e := errorJSON(err); e["code"] != "signupConsent" || !strings.Contains(e["signupNotice"], "dev@example.com") || e["notifyQuestion"] == "" {
+		t.Errorf("login --code without --signup = %v", e)
+	}
+	v, err := jsonStdout(t, func() error {
+		return cmdLogin(dir, []string{"--email", "dev@example.com", "--code", "123456", "--signup", "--notify", "--json"})
+	})
+	if err != nil || v["created"] != true || f.notified == nil || !*f.notified {
+		t.Fatalf("login --code after login_start = %v, %v (notifications %v)", v, err, f.notified)
 	}
 }
 

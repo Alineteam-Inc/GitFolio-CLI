@@ -70,32 +70,9 @@ func cmdLogin(dir string, args []string) error {
 		}
 		return nil
 	}
-	s, ok, err := keptCode(dir, "login", *email)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return failure("codeNotSent", *email)
-	}
-	if !validCode(*code, s.length) {
-		return failure("codeFormat", s.length)
-	}
-	if !s.exists {
-		if !*signup { // what the first run shows, for a code an AI tool sent (MCP login_start)
-			if !jsonOut {
-				notice(terms + tr(lang, "signupFlags"))
-			}
-			err := failure("signupConsent", *email).(*failErr)
-			err.extra = map[string]string{"signupNotice": terms, "notifyQuestion": tr(lang, "notifyAsk")}
-			return err
-		}
-		s.req["isNotified"] = *notify // service notification opt-in, used for a new account only
-	}
-	res, err := c.finishSignIn(s, *code)
-	if err == nil || codeEnded(err) { // a wrong code keeps it: aline.team takes a few tries
-		if kerr := keepCode(dir, "login", *email, nil); err == nil {
-			err = kerr
-		}
+	res, err := finishKeptLogin(dir, c, lang, *email, *code, *signup, *notify)
+	if errorCode(err) == "signupConsent" && !jsonOut { // what the first run shows: the code may come from an AI tool
+		notice(terms + tr(lang, "signupFlags"))
 	}
 	if err != nil {
 		return err
@@ -109,6 +86,37 @@ func cmdLogin(dir string, args []string) error {
 		say(lang, "loggedIn", res.Account.Email)
 	}
 	return nil
+}
+
+// finishKeptLogin finishes the sign-in whose code login --email or an AI tool (login_start) sent and kept
+// here, with the code the user entered in a terminal, the app or the AI tool. An email without an account
+// is signed up only with signup; the error then carries the notice and the question to show first.
+func finishKeptLogin(dir string, c *client, lang, email, code string, signup, notify bool) (signInResult, error) {
+	s, ok, err := keptCode(dir, "login", email)
+	if err != nil {
+		return signInResult{}, err
+	}
+	if !ok {
+		return signInResult{}, failure("codeNotSent", email)
+	}
+	if !validCode(code, s.length) {
+		return signInResult{}, failure("codeFormat", s.length)
+	}
+	if !s.exists {
+		if !signup {
+			err := failure("signupConsent", email).(*failErr)
+			err.extra = map[string]string{"signupNotice": fmt.Sprintf(tr(lang, "signupNotice"), email), "notifyQuestion": tr(lang, "notifyAsk")}
+			return signInResult{}, err
+		}
+		s.req["isNotified"] = notify // service notification opt-in, used for a new account only
+	}
+	res, err := c.finishSignIn(s, code)
+	if err == nil || codeEnded(err) { // a wrong code keeps it: aline.team takes a few tries
+		if kerr := keepCode(dir, "login", email, nil); err == nil {
+			err = kerr
+		}
+	}
+	return res, err
 }
 
 // codeFile keeps the codes sent by email that a later run finishes (login --code, email verify --code),

@@ -176,15 +176,30 @@ var mcpSetupTools = []mcpTool{
 		Title: "Log in: send a code",
 		Description: "Start GitFolio for the user: sends a one-time code to their email; an email without an aline.team " +
 			"account is signed up. The email is the user's own and required: ask them for it, never guess it. Call only " +
-			"after showing the policy and getting the user's agreement (agreed: true). Never ask for the code: the user " +
-			"enters it in the GitFolio app or in a terminal (enterCode in the result). Then check with status that they " +
-			"are logged in.",
+			"after showing the policy and getting the user's agreement (agreed: true). Then the user gives you the code " +
+			"(login_verify) or enters it in the GitFolio app or a terminal (enterCode in the result). Already logged " +
+			"in: nothing is sent.",
 		InputSchema: object(map[string]any{
 			"email":  prop("string", "The user's email, as they gave it."),
 			"agreed": prop("boolean", "The user agreed to the data policy, terms and privacy policy."),
 		}, "email", "agreed"),
 		Annotations: mcpWrites,
 		run:         mcpLoginStart,
+	},
+	{
+		Name:  "login_verify",
+		Title: "Log in: check the code",
+		Description: "Finish logging in with the code from the email login_start sent, when the user gives it to you. An " +
+			"email without an account is signed up only with signup: true, once the user saw signupNotice (login_start) " +
+			"and agreed. A wrong code can be given again a few times.",
+		InputSchema: object(map[string]any{
+			"email":         prop("string", "The email login_start sent the code to."),
+			"code":          prop("string", "The digits from the email, as the user typed them."),
+			"signup":        prop("boolean", "A new account: the user agreed to sign up (terms of service, privacy policy)."),
+			"notifications": prop("boolean", "A new account: the user wants aline.team service emails. Only if they said yes."),
+		}, "email", "code"),
+		Annotations: mcpWrites,
+		run:         mcpLoginVerify,
 	},
 	{
 		Name:  "email_start",
@@ -692,17 +707,57 @@ func mcpLoginStart(dir string, args map[string]any) (any, error) {
 	if err := withLock(dir, func() error { return keepCode(dir, "login", email, &s) }); err != nil {
 		return nil, err
 	}
-	// The code never goes through the conversation: the app or a terminal finishes the login (login --code).
+	// The code is entered here (login_verify), in the app or in a terminal (login --code): all finish it alike.
 	terminal := "gitfolio login --email " + email + " --code <code>"
 	if !s.exists {
 		terminal += " --signup (and --notify for aline.team service emails, only if the user wants them)"
 	}
-	return map[string]any{"codeSentTo": email, "newAccount": !s.exists, "codeDigits": s.length,
-		"enterCode": map[string]string{"app": "the GitFolio app, in Account", "terminal": terminal},
-		"next": "Tell the user to enter the code from that email in the GitFolio app or in a terminal (enterCode); " +
-			"never ask for it here. Once they have, check with status that they are logged in, then register their " +
+	res := map[string]any{"codeSentTo": email, "newAccount": !s.exists, "codeDigits": s.length,
+		"enterCode": map[string]string{"here": "login_verify", "app": "the GitFolio app, in Account", "terminal": terminal},
+		"next": "Ask the user for the code from that email and call login_verify, or let them enter it in the GitFolio " +
+			"app or a terminal (enterCode) and check with status that they are logged in. Then register their " +
 			"repositories with add_repository, choose the sync mode with set_sync_mode, and agree with them what AI " +
-			"tools may see of each repository (set_ai_exposure)."}, nil
+			"tools may see of each repository (set_ai_exposure)."}
+	if !s.exists {
+		lang := detectLang(os.Getenv)
+		res["signupNotice"], res["notifyQuestion"] = fmt.Sprintf(tr(lang, "signupNotice"), email), tr(lang, "notifyAsk")
+	}
+	return res, nil
+}
+
+func mcpLoginVerify(dir string, args map[string]any) (any, error) {
+	email, _ := args["email"].(string)
+	code, _ := args["code"].(string)
+	signup, _ := args["signup"].(bool)
+	notify, _ := args["notifications"].(bool)
+	c, err := newClient(dir)
+	if err != nil {
+		return nil, err
+	}
+	if c.loggedIn() { // entered in the app or a terminal meanwhile
+		return map[string]any{"loggedIn": true, "email": c.creds.Email}, nil
+	}
+	lang := detectLang(os.Getenv)
+	res, err := finishKeptLogin(dir, c, lang, strings.ToLower(strings.TrimSpace(email)), strings.TrimSpace(code), signup, notify)
+	var f *failErr
+	switch {
+	case errors.As(err, &f) && f.key == "signupConsent":
+		return nil, fmt.Errorf("%s\n%sShow the user this and call again with signup: true once they agree "+
+			"(notifications: true only if they want aline.team service emails); the code stays valid.", f.msg, f.extra["signupNotice"])
+	case wrongCode(err):
+		return nil, errors.New("wrong code: ask the user again")
+	case codeEnded(err):
+		return nil, errors.New("the code expired or was tried too often: call login_start again")
+	case err != nil:
+		return nil, err
+	}
+	r := map[string]any{"loggedIn": true, "newAccount": res.Account.Created,
+		"next": "Register the user's repositories with add_repository, choose the sync mode with set_sync_mode, and agree with " +
+			"the user what AI tools may see of each repository (set_ai_exposure)."}
+	if res.Account.Created {
+		r["webLogin"] = strings.TrimSpace(tr(lang, "passwordMail"))
+	}
+	return r, nil
 }
 
 func mcpEmailStart(dir string, args map[string]any) (any, error) {
