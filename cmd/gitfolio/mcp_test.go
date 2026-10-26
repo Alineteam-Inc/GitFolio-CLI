@@ -349,6 +349,9 @@ func TestMCPSetup(t *testing.T) {
 	if cfg, _ := loadConfig(dir); !cfg.AutoSyncOff || !cfg.LocalModeKnown {
 		t.Errorf("local mode not saved: %+v", cfg)
 	}
+	if _, err := call("email_start", map[string]any{"email": "1+dev@users.noreply.github.com"}); errorCode(err) != "emailNoreply" {
+		t.Errorf("email_start on a noreply address: %v", err)
+	}
 	s, err = call("email_start", map[string]any{"email": "work@example.com"})
 	enter, _ = s["enterCode"].(map[string]any)
 	if err != nil || s["codeSentTo"] != "work@example.com" || enter["terminal"] != "gitfolio email verify work@example.com --code <code>" {
