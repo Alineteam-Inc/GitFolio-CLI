@@ -266,6 +266,61 @@ var appMessages = map[string]map[string]string{
 		"ko": "알 수 없는 명령입니다: %q\n",
 		"ja": "不明なコマンド %q です。\n",
 	},
+	"setupActions": {
+		"en": ` [What starting GitFolio does]
+ - Logs in to aline.team; an email without an account gets a new one
+   (agreeing to the terms of service and the privacy policy).
+ - Installs git hooks (post-commit, pre-push) in the repositories you
+   choose, unless you choose none. Hooks you already have still run
+   first; removing the repository from GitFolio puts them back as they
+   were.
+ - Keeps the collected commit information on this computer: %s
+ - Automatic sync sends the past commits of the chosen repositories right
+   away, then after every git push. Local mode sends nothing on its
+   own and calls the aline.team API only when you look something up.
+ - A daily sync, if you choose one, is registered with this computer's
+   scheduler (launchd, systemd or cron, Task Scheduler).
+ - Dependency detection, if you turn it on, reads only the package
+   manager files you approve.
+ - AI coding tools connected to GitFolio see a repository by its real
+   name at most: no commit messages, branch names or file paths unless
+   you allow them.
+`,
+		"ko": ` [GitFolio를 시작하면 하는 일]
+ - aline.team에 로그인합니다. 계정이 없는 이메일이면 새 계정을 만듭니다
+   (이용약관·개인정보처리방침 동의).
+ - 고른 저장소에 git 훅(post-commit·pre-push)을 설치합니다(설치하지 않기를
+   고르면 설치하지 않음). 원래 있던 훅은 그대로 먼저 실행되고, GitFolio에서
+   저장소를 빼면 원래대로 돌립니다.
+ - 수집한 커밋 정보를 이 컴퓨터에 저장합니다: %s
+ - 자동 동기화는 고른 저장소의 지난 커밋 기록을 바로 보내고, 이후 git push
+   때마다 보냅니다. 로컬 모드는 평소에는 보내지 않고, 볼 때만 aline.team
+   API를 호출합니다.
+ - 매일 동기화를 고르면 이 컴퓨터의 예약 작업(launchd, systemd 또는 cron,
+   작업 스케줄러)에 등록합니다.
+ - 의존성 분석을 켜면 승인한 패키지 매니저 파일만 읽습니다.
+ - GitFolio에 연결한 AI 코딩 도구에는 저장소가 실제 이름까지만 보이고,
+   커밋 메시지·브랜치 이름·파일 경로는 허용하기 전에는 보이지 않습니다.
+`,
+		"ja": ` [GitFolio を始めると行うこと]
+ - aline.team にログインします。アカウントのないメールアドレスなら
+   新しいアカウントを作ります(利用規約・プライバシーポリシーに同意)。
+ - 選んだリポジトリに git フック(post-commit・pre-push)をインストール
+   します(インストールしないを選んだ場合は除く)。既存のフックはそのまま
+   先に実行され、GitFolio からリポジトリを外すと元に戻ります。
+ - 収集したコミット情報をこのコンピュータに保存します: %s
+ - 自動同期は、選んだリポジトリの過去のコミット記録をすぐに送り、
+   以後 git push のたびに送ります。ローカルモードは普段は送らず、
+   見るときだけ aline.team の API を呼び出します。
+ - 毎日の同期を選ぶと、このコンピュータの予約タスク(launchd、systemd
+   または cron、タスク スケジューラ)に登録します。
+ - 依存関係の分析をオンにすると、承認したパッケージマネージャー
+   ファイルだけを読みます。
+ - GitFolio に接続した AI コーディングツールには、リポジトリは実名までしか
+   見えず、コミットメッセージ・ブランチ名・ファイルパスは許可するまで
+   見えません。
+`,
+	},
 }
 
 // messages holds the text people read. Policy and consent texts must mean the same in every language

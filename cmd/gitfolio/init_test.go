@@ -308,7 +308,8 @@ func TestSetupJSON(t *testing.T) {
 		return v
 	}
 
-	if v := must(run(cmdInit, "--policy")); !strings.Contains(fmt.Sprint(v["policy"]), "Source code is never collected") {
+	if v := must(run(cmdInit, "--policy")); !strings.Contains(fmt.Sprint(v["policy"]), "Source code is never collected") ||
+		!strings.Contains(fmt.Sprint(v["setupActions"]), "removing the repository from GitFolio") {
 		t.Errorf("policy: %v", v)
 	}
 	if _, err := run(cmdInit, "--scan", "--root", root); errorCode(err) != "loginFirst" {
@@ -411,7 +412,7 @@ func TestAppMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 	failures := regexp.MustCompile(`failure\("(\w+)"`)
-	keys := []string{"relogin", "policy", "signupNotice", "notifyAsk", "progressScan", "progressSend", "gitInstallManual",
+	keys := []string{"relogin", "policy", "setupActions", "signupNotice", "notifyAsk", "progressScan", "progressSend", "gitInstallManual",
 		"gitUpdateApple", "gitUpdateMac", "gitUpdateWindows", "gitUpdateLinux"} // put into JSON
 	for _, f := range src {
 		if strings.HasSuffix(f.Name(), ".go") && !strings.HasSuffix(f.Name(), "_test.go") {

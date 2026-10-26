@@ -30,9 +30,9 @@ commands:
                         under your code folders and choose which ones to collect (without git, it offers
                         to install it first)
   init --policy [--json] | init --scan [--root <folder>]... --json
-                        init's steps for a program, without questions: the data policy, then (logged
-                        in) the repositories and emails found; email, add, deps, config autosync and
-                        schedule set up what the user picks
+                        init's steps for a program, without questions: the data policy and what
+                        starting GitFolio does, then (logged in) the repositories and emails found;
+                        email, add, deps, config autosync and schedule set up what the user picks
   login                 log in / sign up to aline.team with an email code (an email without an
                         account is signed up)
   login --email <email> [--code <code> [--signup [--notify]]] [--json]

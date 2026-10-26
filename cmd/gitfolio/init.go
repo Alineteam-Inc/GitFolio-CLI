@@ -60,7 +60,7 @@ func cmdInit(dir string, args []string) error {
 	switch {
 	case slices.Equal(withoutJSON(args), []string{"--policy"}):
 		if jsonOut { // for a program to show first, as init does
-			return printJSON(map[string]string{"policy": tr(lang, "policy")})
+			return printJSON(map[string]string{"policy": tr(lang, "policy"), "setupActions": setupActions(lang, dir)})
 		}
 		fmt.Fprint(out, indent(tr(lang, "policy")))
 		return nil

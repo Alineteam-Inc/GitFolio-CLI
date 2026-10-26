@@ -672,11 +672,16 @@ var mcpPending struct {
 	tries        int
 }
 
+// setupActions lists what starting GitFolio does, for the policy tool and init --policy --json.
+func setupActions(lang, dir string) string {
+	return strings.TrimSpace(fmt.Sprintf(tr(lang, "setupActions"), tildePath(dir)))
+}
+
 func mcpPolicy(dir string, _ map[string]any) (any, error) {
 	lang := detectLang(os.Getenv)
 	return map[string]any{
 		"dataPolicy":     strings.TrimSpace(tr(lang, "policy")),
-		"setupActions":   strings.TrimSpace(fmt.Sprintf(tr(lang, "setupActions"), tildePath(dir))),
+		"setupActions":   setupActions(lang, dir),
 		"termsOfService": "https://aline.team/terms",
 		"privacyPolicy":  "https://aline.team/privacy",
 		"signingUp":      "An email without an aline.team account is signed up, which means agreeing to the terms of service and the privacy policy.",
