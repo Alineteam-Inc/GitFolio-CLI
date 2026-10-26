@@ -418,6 +418,22 @@ func TestSignInMeLogout(t *testing.T) {
 	if saved, _ := loadCredentials(dir); !reflect.DeepEqual(saved, Credentials{}) {
 		t.Errorf("credentials after logout = %+v, want empty", saved)
 	}
+
+	// A login aline.team no longer takes is not renewed only to be revoked: at a terminal, no code is
+	// asked for, and nothing is warned about.
+	t.Setenv("GITFOLIO_LANG", "en")
+	var buf bytes.Buffer
+	defer func(o, e io.Writer, i func() bool, r *bufio.Reader) { out, errOut, interactive, stdin = o, e, i, r }(out, errOut, interactive, stdin)
+	out, errOut, interactive, stdin = &buf, &buf, func() bool { return true }, bufio.NewReader(strings.NewReader(""))
+	if err := saveCredentials(dir, Credentials{Token: "no longer taken", Email: "dev@example.com", Server: srv.URL}); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdLogout(dir, nil); err != nil || strings.Contains(buf.String(), "has expired") || strings.Contains(buf.String(), "Could not log out") {
+		t.Errorf("logout with a login no longer taken: %v\n%s", err, buf.String())
+	}
+	if saved, _ := loadCredentials(dir); saved.Token != "" {
+		t.Errorf("token kept: %+v", saved)
+	}
 }
 
 // An existing account signs in without the sign-up notice; declining the notice for a new email

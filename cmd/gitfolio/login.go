@@ -119,6 +119,17 @@ func finishKeptLogin(dir string, c *client, lang, email, code string, signup, no
 	return res, err
 }
 
+// revoke has aline.team revoke this device's token, and reports whether it did. send, not call: an
+// expired login is not renewed only to be revoked, and one aline.team no longer takes is no use anyway.
+func (c *client) revoke(lang string) bool {
+	err := c.send("POST", "/cli/logout", nil, nil, true)
+	var ae *apiError
+	if err != nil && !(errors.As(err, &ae) && (ae.Code == codeTokenInvalid || ae.Code == codeNotLoggedIn)) {
+		warn(lang, "logoutServerFailed", err)
+	}
+	return err == nil
+}
+
 // codeFile keeps the codes sent by email that a later run finishes (login --code, email verify --code),
 // one per sign-in or work email, until the code is right or runs out.
 const codeFile = "codes.json"
@@ -258,14 +269,7 @@ func cmdLogout(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	revoked := false
-	if c.loggedIn() {
-		if err := c.call("POST", "/cli/logout", nil, nil); err != nil {
-			warn(detectLang(os.Getenv), "logoutServerFailed", err)
-		} else {
-			revoked = true
-		}
-	}
+	revoked := c.loggedIn() && c.revoke(detectLang(os.Getenv))
 	if err := saveCredentials(dir, Credentials{}); err != nil {
 		return err
 	}

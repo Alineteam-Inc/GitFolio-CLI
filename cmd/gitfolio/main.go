@@ -661,13 +661,7 @@ func cmdUninstall(dir string, args []string) error {
 		if err != nil {
 			return err
 		}
-		if c.loggedIn() { // send, not call: an expired login is not renewed only to be revoked
-			if err := c.send("POST", "/cli/logout", nil, nil, true); err != nil {
-				warn(lang, "logoutServerFailed", err)
-			} else {
-				res.Revoked = true
-			}
-		}
+		res.Revoked = c.loggedIn() && c.revoke(lang)
 		return saveCredentials(dir, Credentials{})
 	})
 	if err != nil {
