@@ -363,6 +363,16 @@ func TestSetupJSON(t *testing.T) {
 	if commits, _ := readCommits(dir); len(commits) != 1 || commits[0].Files[0].Module != moduleID("") {
 		t.Errorf("stored commits not put in the approved module: %v", commits)
 	}
+	// A typo is refused: taken as no file at all, it would decline every one.
+	if _, err := run(cmdDeps, "review", app, "--alow", "package.json"); errorCode(err) != "didYouMeanWord" {
+		t.Errorf("mistyped --allow: %v", err)
+	}
+	if repos, _ := loadRepos(dir); !repos[0].Manifests["package.json"] {
+		t.Errorf("approval after a refused typo: %v", repos[0].Manifests)
+	}
+	if v := must(run(cmdDeps, "review", app, "--allow=package.json")); v["repositories"].([]any)[0].(map[string]any)["files"].([]any)[0].(map[string]any)["state"] != "allowed" {
+		t.Errorf("--allow=: %v", v)
+	}
 	if _, err := run(cmdDeps, "review", app, "--allow", "nope.json"); errorCode(err) != "manifestUnknown" {
 		t.Errorf("unknown file: %v", err)
 	}

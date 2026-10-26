@@ -982,10 +982,15 @@ func changeDeps(dir string, args []string) error {
 		}
 		var allow, rest []string // --allow <file>, any number of times: a program's choice
 		for k := 1; k < len(args); k++ {
-			if args[k] == "--allow" && k+1 < len(args) {
+			switch a := args[k]; {
+			case a == "--allow" && k+1 < len(args):
 				allow, k = append(allow, args[k+1]), k+1
-			} else {
-				rest = append(rest, args[k])
+			case strings.HasPrefix(a, "--allow="):
+				allow = append(allow, strings.TrimPrefix(a, "--allow="))
+			case strings.HasPrefix(a, "-") || len(rest) > 0: // a typo would decline every file
+				return wrongWord("deps review", a, []string{"--allow"}, "gitfolio deps review [path] [--allow <file>]... [--json]")
+			default:
+				rest = append(rest, a)
 			}
 		}
 		top, err := topLevel(pathArg(rest))
