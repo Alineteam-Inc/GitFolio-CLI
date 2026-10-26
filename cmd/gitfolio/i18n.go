@@ -524,6 +524,11 @@ var messages = map[string]map[string]string{
 		"ko": "아직 보내지 않았습니다: %s을(를) 계정에 인증해야 aline.team이 아래 저장소를 받습니다.\n  %s\n`gitfolio email verify %s`로 인증하면 다음 push나 sync 때 보냅니다.\n",
 		"ja": "まだ送信していません: %s をアカウントで認証すると、aline.team が以下のリポジトリを受け付けます。\n  %s\n`gitfolio email verify %s` で認証すると、次の push か sync で送信します。\n",
 	},
+	"purgeShared": {
+		"en": "Its commits were deleted here. Another registered repository has the same address (%s), so aline.team keeps it.\n",
+		"ko": "이 컴퓨터의 커밋은 지웠습니다. 같은 주소(%s)를 쓰는 다른 등록 저장소가 있어 aline.team에서는 지우지 않습니다.\n",
+		"ja": "このコンピューターのコミットは削除しました。同じアドレス(%s)の登録リポジトリがほかにあるため、aline.team からは削除しません。\n",
+	},
 	"purgeQueued": {
 		"en": "Its commits were deleted here. The next sync deletes the repository and your data in it on aline.team;\nif you also linked it on the web, that link and the pull request events you took part in go too.\n",
 		"ko": "이 컴퓨터의 커밋은 지웠습니다. 다음 동기화 때 aline.team에서도 이 저장소와 내 데이터를 지웁니다.\n웹에서도 연동했다면 그 연동과 내가 참여한 PR 기록도 함께 지워집니다.\n",

@@ -550,7 +550,7 @@ func cmdRemove(dir string, args []string) error {
 		warn(detectLang(os.Getenv), "hooksNotRestored", err)
 		hooksErr = err.Error()
 	}
-	deleted := 0
+	deleted, queued := 0, false
 	if *purge {
 		commits, err := readCommits(dir)
 		if err != nil {
@@ -561,8 +561,16 @@ func cmdRemove(dir string, args []string) error {
 		if err := writeCommits(dir, kept); err != nil {
 			return err
 		}
-		if err := queueDeletion(dir, deletion{r.Provider, r.Namespace}); err != nil {
-			return err
+		// aline.team keeps a repository another registered one still sends (a moved or second copy)
+		shared := slices.ContainsFunc(repos, func(x Repo) bool {
+			return x.ID != r.ID && x.Provider == r.Provider && x.Namespace == r.Namespace
+		})
+		if queued = r.Namespace != "" && !shared; queued {
+			if err := queueDeletion(dir, deletion{r.Provider, r.Namespace}); err != nil {
+				return err
+			}
+		} else if shared {
+			notice(fmt.Sprintf(tr(detectLang(os.Getenv), "purgeShared"), r.Namespace))
 		}
 	}
 	repos = slices.Delete(repos, i, i+1)
@@ -582,10 +590,10 @@ func cmdRemove(dir string, args []string) error {
 	}
 	if jsonOut { // what aline.team holds goes with the next sync (serverDeletionQueued)
 		return printJSON(map[string]any{"name": r.Name, "path": r.Path, "hooksRestored": hooksErr == "", "hooksError": hooksErr,
-			"commitsDeleted": deleted, "serverDeletionQueued": *purge})
+			"commitsDeleted": deleted, "serverDeletionQueued": queued})
 	}
 	say(detectLang(os.Getenv), "removed", r.Name)
-	if *purge {
+	if queued {
 		say(detectLang(os.Getenv), "purgeQueued")
 	}
 	return nil

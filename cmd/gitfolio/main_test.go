@@ -287,7 +287,20 @@ func TestRepoCommandsJSON(t *testing.T) {
 	if err := cmdExport(dir, []string{"extra"}); errorCode(err) != "usage" {
 		t.Errorf("export with an argument: %v", err)
 	}
-	if v := run(cmdRemove, repo, "--purge"); v["commitsDeleted"] != 1.0 || v["serverDeletionQueued"] != true || v["hooksRestored"] != true {
-		t.Errorf("remove --purge: %v", v)
+	// A second copy with the same address (say, the folder moved and was added again): purging one
+	// leaves aline.team's copy to the other; purging the last one deletes it there.
+	repos, _ := loadRepos(dir)
+	twin := filepath.Join(t.TempDir(), "app")
+	if err := saveRepos(dir, append(repos, Repo{ID: "twin", Name: "app", Path: twin, Provider: repos[0].Provider, Namespace: repos[0].Namespace})); err != nil {
+		t.Fatal(err)
+	}
+	if v := run(cmdRemove, repo, "--purge"); v["commitsDeleted"] != 1.0 || v["serverDeletionQueued"] != false || v["hooksRestored"] != true {
+		t.Errorf("remove --purge of one of two copies: %v", v)
+	}
+	if st, _ := loadSync(dir); len(st.Deletes) != 0 {
+		t.Errorf("deletion queued with a copy left: %v", st.Deletes)
+	}
+	if v := run(cmdRemove, twin, "--purge"); v["serverDeletionQueued"] != true {
+		t.Errorf("remove --purge of the last copy: %v", v)
 	}
 }
