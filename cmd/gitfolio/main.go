@@ -287,7 +287,7 @@ func run(args []string) error {
 	case "stats":
 		return cmdStats(dir, args[1:]) // outside the lock: it may wait on aline.team
 	case "stack":
-		return cmdStack(dir, args[1:]) // the same
+		return cmdStack(dir, args[1:]) // takes the lock itself, only while reading
 	case "portfolio":
 		return cmdPortfolio(dir, args[1:]) // the same; reads this computer's data under the lock
 	case "email":

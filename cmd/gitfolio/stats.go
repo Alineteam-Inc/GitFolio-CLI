@@ -179,23 +179,27 @@ type techUsages struct {
 // techUsagesNow is the tech stack worked out on this computer from the registered repositories, as
 // aline.team works it out (localStack): no login, nothing sent. For AI tools (ai) the repositories
 // hidden from them count for nothing (config ai).
-func techUsagesNow(dir, lang string, ai bool) (techUsages, error) {
-	repos, err := loadRepos(dir)
-	if err != nil {
-		return techUsages{}, err
-	}
-	if ai {
-		repos = aiView(lang, repos)
-	}
-	commits, err := readCommits(dir)
-	if err != nil {
-		return techUsages{}, err
-	}
-	deps, err := loadDeps(dir)
-	if err != nil {
-		return techUsages{}, err
-	}
-	return localStack(repos, commits, deps), nil
+func techUsagesNow(dir, lang string, ai bool) (u techUsages, err error) {
+	err = withLock(dir, func() error { // a push may be writing them
+		repos, err := loadRepos(dir)
+		if err != nil {
+			return err
+		}
+		if ai {
+			repos = aiView(lang, repos)
+		}
+		commits, err := readCommits(dir)
+		if err != nil {
+			return err
+		}
+		deps, err := loadDeps(dir)
+		if err != nil {
+			return err
+		}
+		u = localStack(repos, commits, deps)
+		return nil
+	})
+	return u, err
 }
 
 // cmdStack shows the tech stack worked out on this computer (techUsagesNow).
