@@ -343,7 +343,7 @@ func TestSetupJSON(t *testing.T) {
 		t.Errorf("verified: %v", v)
 	}
 
-	if v := must(run(cmdAdd, app)); v["name"] != "app" || v["commits"] != 1.0 {
+	if v := must(run(cmdAdd, app)); v["name"] != "app" || v["commits"] != 1.0 || v["hooks"] != true {
 		t.Errorf("add: %v", v)
 	}
 	v = must(run(cmdDeps, "on"))
@@ -370,6 +370,17 @@ func TestSetupJSON(t *testing.T) {
 	}
 	if v := must(run(cmdConfig, "autosync", "off")); v["autoSyncOff"] != true || v["localModeKnown"] != true {
 		t.Errorf("config autosync off: %v", v)
+	}
+
+	// Without git hooks, as the user chose.
+	if v := must(run(cmdAdd, "--no-hooks", lib)); v["name"] != "lib" || v["hooks"] != false {
+		t.Errorf("add --no-hooks: %v", v)
+	}
+	if _, err := os.Stat(filepath.Join(lib, ".git", "hooks", "pre-push")); err == nil {
+		t.Error("add --no-hooks installed hooks")
+	}
+	if repos, _ := loadRepos(dir); len(repos) != 2 || repos[0].NoHooks || !repos[1].NoHooks {
+		t.Errorf("noHooks saved: %+v", repos)
 	}
 }
 
