@@ -439,3 +439,17 @@ func TestMCPStackLeavesHiddenOut(t *testing.T) {
 		t.Errorf("stack: %q here, %q for AI tools", all, ai)
 	}
 }
+
+// The status tool gives the last sync error masked: a failed deletion names the URL of a repository the
+// user may have hidden from AI tools.
+func TestMCPStatusMasksSyncError(t *testing.T) {
+	dir := t.TempDir()
+	if err := saveSync(dir, syncState{LastError: `Delete "https://aline.team/api/cli/repositories?namespace=corp%2Fsecret-proj": dial tcp: lookup aline.team: no such host`}); err != nil {
+		t.Fatal(err)
+	}
+	v, err := mcpStatus(dir, nil)
+	got := fmt.Sprint(v.(map[string]any)["lastSyncError"])
+	if err != nil || strings.Contains(got, "secret-proj") || !strings.Contains(got, "[URL]") || !strings.Contains(got, "no such host") {
+		t.Errorf("lastSyncError = %q, %v", got, err)
+	}
+}

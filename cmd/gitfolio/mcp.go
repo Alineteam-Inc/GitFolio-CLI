@@ -405,8 +405,10 @@ func mcpStatus(dir string, _ map[string]any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The error masked as commit messages are: a failed request names its URL, the address of a repository
+	// that may be hidden from AI tools.
 	return map[string]any{"loggedIn": c.loggedIn(), "repositories": list, "syncMode": mode, "lastSync": st.LastSync,
-		"lastSyncError": st.LastError}, nil
+		"lastSyncError": newMasker(cfg.Mask).apply(st.LastError)}, nil
 }
 
 func mcpDevType(dir string, args map[string]any) (any, error) {
