@@ -48,6 +48,7 @@ func cmdLogin(dir string, args []string) error {
 	if !validEmail(*email) {
 		return failure("emailInvalid")
 	}
+	terms := fmt.Sprintf(tr(lang, "signupNotice"), *email)
 	if *code == "" {
 		s, err := c.startSignIn(*email)
 		if err != nil {
@@ -56,7 +57,6 @@ func cmdLogin(dir string, args []string) error {
 		if err := keepCode(dir, "login", *email, &s); err != nil {
 			return err
 		}
-		terms := fmt.Sprintf(tr(lang, "signupNotice"), *email)
 		if jsonOut {
 			res := map[string]any{"email": *email, "accountExists": s.exists, "codeLength": s.length}
 			if !s.exists { // for the program to show before it signs up, in the screen's language
@@ -81,8 +81,13 @@ func cmdLogin(dir string, args []string) error {
 		return failure("codeFormat", s.length)
 	}
 	if !s.exists {
-		if !*signup {
-			return failure("signupConsent", *email)
+		if !*signup { // what the first run shows, for a code an AI tool sent (MCP login_start)
+			if !jsonOut {
+				notice(terms + tr(lang, "signupFlags"))
+			}
+			err := failure("signupConsent", *email).(*failErr)
+			err.extra = map[string]string{"signupNotice": terms, "notifyQuestion": tr(lang, "notifyAsk")}
+			return err
 		}
 		s.req["isNotified"] = *notify // service notification opt-in, used for a new account only
 	}

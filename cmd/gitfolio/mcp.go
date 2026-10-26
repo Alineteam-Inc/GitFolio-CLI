@@ -738,7 +738,7 @@ func mcpEmailStart(dir string, args map[string]any) (any, error) {
 		return nil, err
 	}
 	return map[string]any{"codeSentTo": email, "codeDigits": s.length,
-		"enterCode": map[string]string{"app": "the GitFolio app, in Account", "terminal": "gitfolio email verify " + email + " --code <code>"},
+		"enterCode": map[string]string{"app": "the GitFolio app, in Account › Git author emails", "terminal": "gitfolio email verify " + email + " --code <code>"},
 		"next":      "Tell the user to enter the code from that email in the GitFolio app or in a terminal (enterCode); never ask for it here."}, nil
 }
 

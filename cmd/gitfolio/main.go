@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -135,7 +136,7 @@ progress of a long run, one JSON line per step: {"progress": {"step", "text", "d
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		if jsonOut {
-			_ = printJSON(map[string]any{"error": map[string]string{"code": errorCode(err), "message": err.Error()}})
+			_ = printJSON(map[string]any{"error": errorJSON(err)})
 		} else {
 			warn(detectLang(os.Getenv), "failed", err)
 		}
@@ -170,6 +171,16 @@ func errorCode(err error) string {
 		return serverCodes[ae.Code]
 	}
 	return "failed"
+}
+
+// errorJSON is the {"error": ...} a failure prints with --json: its code, message and extra texts.
+func errorJSON(err error) map[string]string {
+	e := map[string]string{"code": errorCode(err), "message": err.Error()}
+	var f *failErr
+	if errors.As(err, &f) {
+		maps.Copy(e, f.extra)
+	}
+	return e
 }
 
 var serverCodes = map[string]string{

@@ -315,7 +315,14 @@ func TestMCPSetup(t *testing.T) {
 		!strings.HasPrefix(fmt.Sprint(enter["terminal"]), "gitfolio login --email dev@example.com --code <code> --signup") {
 		t.Fatalf("login_start = %v, %v", s, err)
 	}
-	// The app or a terminal finishes it with the code, as login --code does after login --email.
+	// The app or a terminal finishes it with the code, as login --code does after login --email; a new
+	// account first gets what the sending run would have shown, and the code stays.
+	_, err = jsonStdout(t, func() error {
+		return cmdLogin(dir, []string{"--email", "dev@example.com", "--code", "123456", "--json"})
+	})
+	if e := errorJSON(err); e["code"] != "signupConsent" || !strings.Contains(e["signupNotice"], "dev@example.com") || e["notifyQuestion"] == "" {
+		t.Errorf("login --code without --signup = %v", e)
+	}
 	v, err := jsonStdout(t, func() error {
 		return cmdLogin(dir, []string{"--email", "dev@example.com", "--code", "123456", "--signup", "--notify", "--json"})
 	})

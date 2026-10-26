@@ -139,11 +139,15 @@ func blank() {
 // failure returns a translated error; main prints it with the GitFolio prefix. Errors that come from
 // git itself or only show up in hooks stay as they are.
 func failure(key string, args ...any) error {
-	return &failErr{key, strings.TrimSpace(fmt.Sprintf(tr(detectLang(os.Getenv), key), args...))}
+	return &failErr{key, strings.TrimSpace(fmt.Sprintf(tr(detectLang(os.Getenv), key), args...)), nil}
 }
 
-// failErr is a translated error; its message key is the code --json gives programs (errorCode).
-type failErr struct{ key, msg string }
+// failErr is a translated error; its message key is the code --json gives programs (errorCode), and
+// extra is more text for a program to show, beside the code and the message (errorJSON).
+type failErr struct {
+	key, msg string
+	extra    map[string]string
+}
 
 func (e *failErr) Error() string { return e.msg }
 
