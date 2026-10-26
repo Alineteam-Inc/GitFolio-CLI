@@ -230,7 +230,7 @@ var mcpSetupTools = []mcpTool{
 		Title: "Choose the sync mode",
 		Description: "local (the default): nothing goes out on its own; GitFolio calls the aline.team API, with daily totals, " +
 			"only when its devtype or portfolio is asked for. automatic: the user's commits go to aline.team right after each git push, the past ones " +
-			"right away. Ask the user; leave it local unless they choose automatic.",
+			"with the next push or sync. Ask the user; leave it local unless they choose automatic.",
 		InputSchema: object(map[string]any{"mode": map[string]any{"type": "string", "enum": []string{"automatic", "local"}}}, "mode"),
 		Annotations: mcpWrites,
 		run:         mcpSetSyncMode,
@@ -833,21 +833,8 @@ func mcpSetSyncMode(dir string, args map[string]any) (any, error) {
 	if mode != "automatic" && mode != "local" {
 		return nil, errors.New("mode is automatic or local")
 	}
-	lang := detectLang(os.Getenv)
-	if err := withLock(dir, func() error {
-		cfg, err := loadConfig(dir)
-		if err != nil {
-			return err
-		}
-		cfg.AutoSyncOff, cfg.LocalModeKnown = mode == "local", true
-		if err := saveConfig(dir, cfg); err != nil {
-			return err
-		}
-		if cfg.AutoSyncOff && cfg.Schedule != "" { // local mode sends nothing by itself: no daily sync either
-			return setSchedule(dir, lang, "")
-		}
-		return nil
-	}); err != nil {
+	on := map[string]string{"automatic": "on", "local": "off"}[mode]
+	if err := withLock(dir, func() error { return changeConfig(dir, []string{"autosync", on}) }); err != nil {
 		return nil, err
 	}
 	return map[string]any{"syncMode": mode}, nil

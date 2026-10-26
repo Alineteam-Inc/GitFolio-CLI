@@ -45,8 +45,8 @@ ask, and never guess an email, a code or a repository.
      File paths, folders and file names are never shown, whatever is set.
 6. **Sync with aline.team?** GitFolio is in local mode by default: nothing goes out on its own, and it
    calls the aline.team API, with daily totals, only when the user looks up their type or portfolio. Ask whether they want automatic sync
-   instead (the past commits right away, then after each git push, to keep their aline.team profile
-   current). Call `set_sync_mode` only if they choose automatic.
+   instead (the past commits with the next push or sync, then after each git push, to keep their
+   aline.team profile current). Call `set_sync_mode` only if they choose automatic.
 7. **Summary.** List what was set and how to change it later: `gitfolio config ai`, `gitfolio config
    autosync on|off`, `gitfolio email`.
 
