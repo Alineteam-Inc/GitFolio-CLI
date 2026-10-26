@@ -22,13 +22,16 @@ ask, and never guess an email, a code or a repository.
      scheduler, what AI tools see.
    Go on only when the user agrees. Before each later step that does one of these, say so again in a line.
 3. **Email (required).** Ask for the email to use. You may mention the git email of this repository, but
-   the user decides. Ask whether they want aline.team service emails (no unless they say yes). Call
-   `login_start` with `agreed: true`, then ask for the code from the email and call `login_verify`.
+   the user decides. Call `login_start` with `agreed: true`. Never ask for the code from the email: the
+   user enters it in the GitFolio app or in a terminal, as `enterCode` in the result says (a new account
+   is signed up there; whether to receive aline.team service emails is asked there too). Once they have,
+   check with `status` that they are logged in.
 4. **Repositories.** Ask which repositories to register (suggest the current one). Tell them each gets git
    hooks (post-commit, pre-push) in this computer's `.git` folder only: nothing is added to the repository
    or its remote, they never stop a commit or push, hooks they have still run first, and `gitfolio remove`
    undoes it. Call `add_repository` for each. If a repository's git email is not the account's, offer
-   `email_start` and `email_verify`: aline.team takes commits only under verified emails.
+   `email_start`: aline.team takes commits only under verified emails. The user enters that code in the
+   app or a terminal too (`enterCode`), never here.
 5. **What AI tools may see**, for each repository:
    - First read the codebase's own rules: `CLAUDE.md`, `AGENTS.md`, `.cursor/rules`, `CONTRIBUTING`,
      security or confidentiality notes. Note anything about company or customer names, confidential

@@ -18,8 +18,8 @@ remove, purge or change settings yourself.
 2. Match what you see:
    - `loggedIn` false: nothing is sent; use the `setup` skill (or `gitfolio login`).
    - `waitingForVerifiedEmail`: aline.team takes that repository only after its email is verified.
-     `gitfolio email` shows which email; verify it with `gitfolio email verify <email>`, or with
-     `email_start` and `email_verify` if the user wants you to.
+     `gitfolio email` shows which email; verify it with `gitfolio email verify <email>`, or send the
+     code with `email_start` if the user wants you to (they enter it in the app or a terminal, not here).
    - `syncMode` is `local`: nothing is sent by itself; statistics go when the user asks for their type
      or portfolio, or runs `gitfolio sync`. `gitfolio config autosync on` sends after every push.
    - Commits here but fewer on aline.team, no error: run `gitfolio sync --dry-run` to see what would go,

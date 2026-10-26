@@ -176,41 +176,25 @@ var mcpSetupTools = []mcpTool{
 		Title: "Log in: send a code",
 		Description: "Start GitFolio for the user: sends a one-time code to their email; an email without an aline.team " +
 			"account is signed up. The email is the user's own and required: ask them for it, never guess it. Call only " +
-			"after showing the policy and getting the user's agreement (agreed: true). Then ask the user for the code and " +
-			"call login_verify.",
+			"after showing the policy and getting the user's agreement (agreed: true). Never ask for the code: the user " +
+			"enters it in the GitFolio app or in a terminal (enterCode in the result). Then check with status that they " +
+			"are logged in.",
 		InputSchema: object(map[string]any{
-			"email":         prop("string", "The user's email, as they gave it."),
-			"agreed":        prop("boolean", "The user agreed to the data policy, terms and privacy policy."),
-			"notifications": prop("boolean", "A new account: the user wants aline.team service emails. Only if they said yes."),
+			"email":  prop("string", "The user's email, as they gave it."),
+			"agreed": prop("boolean", "The user agreed to the data policy, terms and privacy policy."),
 		}, "email", "agreed"),
 		Annotations: mcpWrites,
 		run:         mcpLoginStart,
 	},
 	{
-		Name:        "login_verify",
-		Title:       "Log in: check the code",
-		Description: "Finish logging in with the code the user got by email (login_start). A wrong code can be tried again a few times.",
-		InputSchema: object(map[string]any{"code": prop("string", "The digits from the email, as the user typed them.")}, "code"),
-		Annotations: mcpWrites,
-		run:         mcpLoginVerify,
-	},
-	{
 		Name:  "email_start",
 		Title: "Add a work email",
 		Description: "Add another email the user commits with (a repository's git user.email that is not their account email) " +
-			"and send it a code; aline.team takes a repository's commits only under verified emails. Then ask the user " +
-			"for the code and call email_verify.",
+			"and send it a code; aline.team takes a repository's commits only under verified emails. Never ask for the " +
+			"code: the user enters it in the GitFolio app or in a terminal (enterCode in the result).",
 		InputSchema: object(map[string]any{"email": prop("string", "The work email, as the user gave it.")}, "email"),
 		Annotations: mcpWrites,
 		run:         mcpEmailStart,
-	},
-	{
-		Name:        "email_verify",
-		Title:       "Verify a work email",
-		Description: "Verify the work email of email_start with the code the user got.",
-		InputSchema: object(map[string]any{"code": prop("string", "The digits from the email, as the user typed them.")}, "code"),
-		Annotations: mcpWrites,
-		run:         mcpEmailVerify,
 	},
 	{
 		Name:  "add_repository",
@@ -665,13 +649,6 @@ func mcpSetExposure(dir string, args map[string]any) (any, error) {
 	return mcpAISettings(dir, nil)
 }
 
-// mcpPending is a code sent by email that a later tool call answers: a sign-in or a work email check.
-var mcpPending struct {
-	login, email *codeStart
-	address      string
-	tries        int
-}
-
 // setupActions lists what starting GitFolio does, for the policy tool and init --policy --json.
 func setupActions(lang, dir string) string {
 	return strings.TrimSpace(fmt.Sprintf(tr(lang, "setupActions"), tildePath(dir)))
@@ -712,56 +689,20 @@ func mcpLoginStart(dir string, args map[string]any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !s.exists {
-		notify, _ := args["notifications"].(bool)
-		s.req["isNotified"] = notify // service emails: only when the user said yes
-	}
-	mcpPending.login, mcpPending.tries = &s, 0
-	return map[string]any{"codeSentTo": email, "newAccount": !s.exists, "codeDigits": s.length,
-		"next": "Ask the user for the code in that email, then call login_verify with it."}, nil
-}
-
-func mcpLoginVerify(dir string, args map[string]any) (any, error) {
-	var res signInResult
-	if err := mcpCode(dir, args, &mcpPending.login, "login_start", func(c *client, s codeStart, code string) (err error) {
-		res, err = c.finishSignIn(s, code)
-		return err
-	}); err != nil {
+	if err := withLock(dir, func() error { return keepCode(dir, "login", email, &s) }); err != nil {
 		return nil, err
 	}
-	r := map[string]any{"loggedIn": true, "newAccount": res.Account.Created,
-		"next": "Register the user's repositories with add_repository, choose the sync mode with set_sync_mode, and agree with " +
-			"the user what AI tools may see of each repository (set_ai_exposure)."}
-	if res.Account.Created {
-		r["webLogin"] = strings.TrimSpace(tr(detectLang(os.Getenv), "passwordMail"))
+	// The code never goes through the conversation: the app or a terminal finishes the login (login --code).
+	terminal := "gitfolio login --email " + email + " --code <code>"
+	if !s.exists {
+		terminal += " --signup (and --notify for aline.team service emails, only if the user wants them)"
 	}
-	return r, nil
-}
-
-// mcpCode finishes what start left waiting in *pending with the code the user gives. A wrong code can be
-// given again while tries are left; any other end drops what was waiting.
-func mcpCode(dir string, args map[string]any, pending **codeStart, start string, finish func(c *client, s codeStart, code string) error) error {
-	s := *pending
-	if s == nil {
-		return fmt.Errorf("no code is waiting: call %s first", start)
-	}
-	code, _ := args["code"].(string)
-	if code = strings.TrimSpace(code); !validCode(code, s.length) {
-		return fmt.Errorf("the code is %d digits", s.length)
-	}
-	c, err := newClient(dir)
-	if err != nil {
-		return err
-	}
-	err = finish(c, *s, code)
-	if wrongCode(err) {
-		if mcpPending.tries++; mcpPending.tries < maxCodeTries {
-			return fmt.Errorf("wrong code: ask the user again (%d tries left)", maxCodeTries-mcpPending.tries)
-		}
-		err = errors.New("too many wrong codes: start again")
-	}
-	*pending = nil
-	return err
+	return map[string]any{"codeSentTo": email, "newAccount": !s.exists, "codeDigits": s.length,
+		"enterCode": map[string]string{"app": "the GitFolio app, in Account", "terminal": terminal},
+		"next": "Tell the user to enter the code from that email in the GitFolio app or in a terminal (enterCode); " +
+			"never ask for it here. Once they have, check with status that they are logged in, then register their " +
+			"repositories with add_repository, choose the sync mode with set_sync_mode, and agree with them what AI " +
+			"tools may see of each repository (set_ai_exposure)."}, nil
 }
 
 func mcpEmailStart(dir string, args map[string]any) (any, error) {
@@ -793,18 +734,12 @@ func mcpEmailStart(dir string, args map[string]any) (any, error) {
 	if done {
 		return map[string]any{"verified": true}, nil
 	}
-	mcpPending.email, mcpPending.address, mcpPending.tries = &s, email, 0
-	return map[string]any{"codeSentTo": email, "codeDigits": s.length,
-		"next": "Ask the user for the code in that email, then call email_verify with it."}, nil
-}
-
-func mcpEmailVerify(dir string, args map[string]any) (any, error) {
-	if err := mcpCode(dir, args, &mcpPending.email, "email_start", func(c *client, s codeStart, code string) error {
-		return c.finishEmailCheck(s, code)
-	}); err != nil {
+	if err := withLock(dir, func() error { return keepCode(dir, "email", email, &s) }); err != nil {
 		return nil, err
 	}
-	return map[string]any{"verified": true, "email": mcpPending.address}, nil
+	return map[string]any{"codeSentTo": email, "codeDigits": s.length,
+		"enterCode": map[string]string{"app": "the GitFolio app, in Account", "terminal": "gitfolio email verify " + email + " --code <code>"},
+		"next":      "Tell the user to enter the code from that email in the GitFolio app or in a terminal (enterCode); never ask for it here."}, nil
 }
 
 func mcpAddRepository(dir string, args map[string]any) (any, error) {

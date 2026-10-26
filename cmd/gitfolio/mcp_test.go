@@ -304,22 +304,24 @@ func TestMCPSetup(t *testing.T) {
 		!strings.Contains(fmt.Sprint(p["setupActions"]), "git hooks (post-commit, pre-push)") {
 		t.Errorf("policy = %v", p)
 	}
-	if _, err := call("login_verify", map[string]any{"code": "123456"}); err == nil {
-		t.Error("verified with no code sent")
+	for _, name := range []string{"login_verify", "email_verify"} {
+		if slices.ContainsFunc(mcpTools, func(x mcpTool) bool { return x.Name == name }) {
+			t.Errorf("%s takes a code in the conversation", name)
+		}
 	}
-	s, err := call("login_start", map[string]any{"email": "Dev@Example.com", "agreed": true, "notifications": true})
-	if err != nil || s["newAccount"] != true || s["codeDigits"] != float64(6) {
+	s, err := call("login_start", map[string]any{"email": "Dev@Example.com", "agreed": true})
+	enter, _ := s["enterCode"].(map[string]any)
+	if err != nil || s["newAccount"] != true || s["codeDigits"] != float64(6) ||
+		!strings.HasPrefix(fmt.Sprint(enter["terminal"]), "gitfolio login --email dev@example.com --code <code> --signup") {
 		t.Fatalf("login_start = %v, %v", s, err)
 	}
-	if _, err := call("login_verify", map[string]any{"code": "12345"}); err == nil || !strings.Contains(err.Error(), "6 digits") {
-		t.Errorf("short code: %v", err)
-	}
-	if _, err := call("login_verify", map[string]any{"code": "000000"}); err == nil || !strings.Contains(err.Error(), "tries left") {
-		t.Errorf("wrong code: %v", err)
-	}
-	v, err := call("login_verify", map[string]any{"code": "123456"})
-	if err != nil || v["loggedIn"] != true || v["newAccount"] != true || v["webLogin"] == nil || f.notified == nil || !*f.notified {
-		t.Fatalf("login_verify = %v, %v (notifications %v)", v, err, f.notified)
+	// The app or a terminal finishes it with the code, as login --code does after login --email.
+	v, err := jsonStdout(t, func() error {
+		return cmdLogin(dir, []string{"--email", "dev@example.com", "--code", "123456", "--signup", "--notify", "--json"})
+	})
+	jsonOut = false
+	if err != nil || v["created"] != true || f.notified == nil || !*f.notified {
+		t.Fatalf("login --code after login_start = %v, %v (notifications %v)", v, err, f.notified)
 	}
 	if again, _ := call("login_start", map[string]any{"email": "dev@example.com", "agreed": true}); again["loggedIn"] != true {
 		t.Errorf("logging in again = %v", again)
@@ -341,14 +343,21 @@ func TestMCPSetup(t *testing.T) {
 	if cfg, _ := loadConfig(dir); !cfg.AutoSyncOff || !cfg.LocalModeKnown {
 		t.Errorf("local mode not saved: %+v", cfg)
 	}
-	if s, err := call("email_start", map[string]any{"email": "work@example.com"}); err != nil || s["codeSentTo"] != "work@example.com" {
+	s, err = call("email_start", map[string]any{"email": "work@example.com"})
+	enter, _ = s["enterCode"].(map[string]any)
+	if err != nil || s["codeSentTo"] != "work@example.com" || enter["terminal"] != "gitfolio email verify work@example.com --code <code>" {
 		t.Fatalf("email_start = %v, %v", s, err)
 	}
-	if _, err := call("email_verify", map[string]any{"code": "000000"}); err == nil || !strings.Contains(err.Error(), "tries left") {
-		t.Errorf("wrong work email code: %v", err)
-	}
-	if v, err := call("email_verify", map[string]any{"code": "123456"}); err != nil || v["verified"] != true {
-		t.Errorf("email_verify = %v, %v", v, err)
+	v, err = jsonStdout(t, func() error {
+		return cmdEmail(dir, []string{"verify", "work@example.com", "--code", "123456", "--json"})
+	})
+	jsonOut = false
+	list, _ := v["emails"].([]any)
+	if err != nil || !slices.ContainsFunc(list, func(e any) bool {
+		m, _ := e.(map[string]any)
+		return m["email"] == "work@example.com" && m["verified"] == true
+	}) {
+		t.Errorf("email verify --code after email_start = %v, %v", v, err)
 	}
 	if cfg, _ := loadConfig(dir); !slices.Contains(cfg.Emails, "work@example.com") {
 		t.Errorf("work email not kept: %v", cfg.Emails)
