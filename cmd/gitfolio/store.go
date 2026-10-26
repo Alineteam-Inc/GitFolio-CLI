@@ -211,10 +211,9 @@ func readCommits(dir string) ([]Commit, error) {
 	sc.Buffer(nil, 16<<20) // long commit messages
 	for sc.Scan() {
 		var c Commit
-		if err := json.Unmarshal(sc.Bytes(), &c); err != nil {
-			return nil, err
+		if json.Unmarshal(sc.Bytes(), &c) == nil { // skip a line cut short (a full disk, a crash): the next scan collects it again
+			commits = append(commits, c)
 		}
-		commits = append(commits, c)
 	}
 	return commits, sc.Err()
 }

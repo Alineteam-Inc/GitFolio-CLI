@@ -522,3 +522,21 @@ func TestMovedRepositoryCollectsAgain(t *testing.T) {
 		t.Errorf("exported: %d commits, %v", len(out.Commits), err)
 	}
 }
+
+// A line of commits.jsonl cut short (the disk filled up while appending) is skipped, not an error for
+// every command after it.
+func TestTornCommitLineSkipped(t *testing.T) {
+	dir := t.TempDir()
+	if err := writeCommits(dir, []Commit{{Repo: "a", Hash: "a1", Message: "ok"}}); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(filepath.Join(dir, "commits.jsonl"), os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString(`{"repo":"a","hash":"a2","mess`)
+	f.Close()
+	if commits, err := readCommits(dir); err != nil || len(commits) != 1 || commits[0].Hash != "a1" {
+		t.Errorf("read with a torn last line: %+v, %v", commits, err)
+	}
+}
