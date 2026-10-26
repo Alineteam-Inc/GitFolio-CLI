@@ -41,10 +41,8 @@ commands:
                         --notify: also receive aline.team service notifications by email)
   logout [--json]       sign out: revoke and remove this device's token
   whoami [--json]       show the aline.team account this device is signed in to
-  add [path] [--no-hooks] [--json]
-                        register a repository, collect its commits and install git hooks
+  add [path] [--json]   register a repository, collect its commits and install git hooks
                         (post-commit, pre-push) so later pushes are collected automatically
-                        (--no-hooks: none; its pushes go by sync or the daily sync)
   remove [path] [--purge] [--json]
                         unregister a repository and restore its previous hooks
                         (--purge: also delete its collected commits, here and on aline.team)
@@ -452,20 +450,16 @@ func flagsFirst(args []string) []string {
 
 func cmdAdd(dir string, args []string) error {
 	jsonMode(args)
-	args = withoutJSON(args)
-	noHooks := slices.Contains(args, "--no-hooks") // the user chose none, as in init
-	top, err := topLevel(pathArg(slices.DeleteFunc(args, func(a string) bool { return a == "--no-hooks" })))
+	top, err := topLevel(pathArg(withoutJSON(args)))
 	if err != nil {
 		return err
 	}
-	r := newRepo(top)
-	r.NoHooks = noHooks
-	n, err := registerRepo(dir, r, true)
+	n, err := registerRepo(dir, newRepo(top), true)
 	if err != nil {
 		return err
 	}
 	if jsonOut {
-		return printJSON(map[string]any{"name": filepath.Base(top), "path": top, "commits": n, "hooks": !noHooks})
+		return printJSON(map[string]any{"name": filepath.Base(top), "path": top, "commits": n})
 	}
 	say(detectLang(os.Getenv), "registered", filepath.Base(top), n)
 	return nil
