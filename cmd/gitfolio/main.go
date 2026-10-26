@@ -113,8 +113,8 @@ commands:
                         ones (✔, email code) merge the repositories linked on aline.team with them;
                         without a terminal, verify sends the code and verify --code finishes
   schedule [HH:MM | off] [--json]
-                        optional daily sync at a local time, for pushes the hooks missed
-                        (launchd on macOS, systemd or cron on Linux); no argument: show it
+                        optional daily sync at a local time, for pushes the hooks missed (launchd on
+                        macOS, systemd or cron on Linux, Task Scheduler on Windows); no argument: show it
   update [--path <gitfolio>] [--json]
                         install the newest release now (otherwise GitFolio offers it once a day), the
                         way it was installed; --path: of the gitfolio there instead of this one

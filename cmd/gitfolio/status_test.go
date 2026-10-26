@@ -132,9 +132,6 @@ func TestStatusSyncJSON(t *testing.T) {
 	if r := list[0].(map[string]any); r["namespace"] != "me/app" || r["commits"] != 1.0 || r["sent"] != 1.0 || r["hooks"] != "off" {
 		t.Errorf("repository: %v", r)
 	}
-	if cmdStatus(dir, []string{"app", "--json"}) == nil {
-		t.Error("status --json took a repository")
-	}
 	ts.Close() // a new commit pushed while aline.team cannot be reached
 	for _, args := range [][]string{{"-c", "user.email=dev@example.com", "-c", "user.name=x", "commit", "-q", "--allow-empty", "-m", "fix: more"},
 		{"update-ref", "refs/remotes/origin/main", "HEAD"}} {

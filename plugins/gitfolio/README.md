@@ -57,6 +57,6 @@ Any other tool that runs MCP servers: add the command `gitfolio mcp`.
 - `devtype` and `portfolio` ask aline.team for the developer type, as `gitfolio stats` does; in local
   mode they first run the sync it runs. `stack` is worked out on this computer, as `gitfolio stack` is. Logging in and adding a repository work as
   `gitfolio login` and `gitfolio add` do. What the CLI sends to aline.team is listed in its
-  [README](https://github.com/Alineteam-Inc/GitFolio-CLI#nothing-is-collected-without-your-permission).
+  [README](https://github.com/Alineteam-Inc/GitFolio-CLI#what-leaves-your-computer).
 
 Apache-2.0, like GitFolio. GitFolio and aline.team are Alineteam Inc.'s names.
