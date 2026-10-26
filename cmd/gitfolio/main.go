@@ -101,10 +101,11 @@ commands:
                         keep git's own record of the git commands gitfolio runs (on by default;
                         off deletes it)
   config ai [name <repo> real|anonymous|<name> | messages <repo> off|subjects|full |
-            branches <repo> on|off | hide|show <repo>]
+            branches <repo> on|off | hide|show <repo>] [--json]
                         what AI coding tools see of each repository through gitfolio mcp: its real
                         name (default), anonymous or another name; commit messages and branch names
                         (off by default); or nothing. Paths and file names are never shown
+                        (--json: every repository's settings, after a change too)
   history [--all] [--json]
                         the git commands gitfolio ran, newest last (--all: every run kept)
   email [add <email>... | verify <email> [--code <code>] | rm <email> | primary <email>] [--json]
@@ -900,7 +901,7 @@ func printJSON(v any) error {
 func cmdConfig(dir string, args []string) error {
 	jsonMode(args)
 	args = withoutJSON(args)
-	if err := changeConfig(dir, args); err != nil || !jsonOut || len(args) == 0 {
+	if err := changeConfig(dir, args); err != nil || !jsonOut || len(args) == 0 || args[0] == "ai" { // config ai prints its own
 		return err
 	}
 	cfg, err := loadConfig(dir)

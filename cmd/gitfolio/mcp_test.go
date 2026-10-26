@@ -206,6 +206,16 @@ func TestAIExposure(t *testing.T) {
 			t.Errorf("config ai shows no %q:\n%s", want, buf.String())
 		}
 	}
+	// For a program: every repository in config ai's words, after a change too.
+	v, err := jsonStdout(t, func() error { return cmdConfig(dir, []string{"ai", "branches", "internal-tool", "on", "--json"}) })
+	jsonOut = false
+	got := fmt.Sprint(v["repositories"])
+	if err != nil || got != "[map[branches:off hidden:false messages:off name:Payments backend path:/work/acme-payments repository:acme-payments] "+
+		"map[branches:off hidden:true messages:off name:real path:/work/secret-proj repository:secret-proj] "+
+		"map[branches:off hidden:false messages:subjects name:real path:/home/me/side repository:side] "+
+		"map[branches:on hidden:false messages:off name:real path:/work/internal-tool repository:internal-tool]]" {
+		t.Errorf("config ai --json: %v\n%s", err, got)
+	}
 
 	in := strings.Join([]string{
 		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"set_ai_exposure","arguments":{"repository":"internal-tool","name":"anonymous","branches":false}}}`,

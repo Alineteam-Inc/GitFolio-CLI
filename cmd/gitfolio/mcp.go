@@ -548,6 +548,9 @@ func cmdConfigAI(dir string, args []string) error {
 	for _, v := range aiView(lang, repos) {
 		seen[v.ID] = v.Name
 	}
+	if len(args) == 0 && jsonOut {
+		return aiSettingsJSON(repos)
+	}
 	if len(args) == 0 {
 		var b strings.Builder
 		for _, r := range repos {
@@ -576,11 +579,34 @@ func cmdConfigAI(dir string, args []string) error {
 	if err := saveRepos(dir, repos); err != nil {
 		return err
 	}
+	if jsonOut {
+		return aiSettingsJSON(repos)
+	}
 	for _, v := range aiView(lang, repos) {
 		seen[v.ID] = v.Name
 	}
 	say(lang, "aiSet", repos[i].Name, exposureText(lang, repos[i], seen[repos[i].ID]))
 	return nil
+}
+
+// aiSettingsJSON is config ai --json: every repository, hidden ones too, with what AI tools see of it in
+// config ai's words. A new repository is real, off, off, not hidden.
+func aiSettingsJSON(repos []Repo) error {
+	type setting struct {
+		Repository string `json:"repository"` // as gitfolio status names it
+		Path       string `json:"path"`
+		Name       string `json:"name"` // real, anonymous or the other name
+		Messages   string `json:"messages"`
+		Branches   string `json:"branches"`
+		Hidden     bool   `json:"hidden"`
+	}
+	list := []setting{}
+	for _, r := range repos {
+		name := cmp.Or(map[string]string{"": "real", anonymousName: "anonymous"}[r.AI.Name], r.AI.Name)
+		list = append(list, setting{r.Name, r.Path, name, cmp.Or(r.AI.Messages, "off"),
+			map[bool]string{true: "on", false: "off"}[r.AI.Branches], r.AI.Hidden})
+	}
+	return printJSON(map[string]any{"repositories": list})
 }
 
 func mcpAISettings(dir string, _ map[string]any) (any, error) {
