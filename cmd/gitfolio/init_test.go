@@ -528,7 +528,8 @@ func TestGitInstaller(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(os.Getenv("HOME"), ".config"))
 	t.Setenv("AppData", filepath.Join(os.Getenv("HOME"), "AppData"))
 	v, err := jsonStdout(t, func() error { return run([]string{"init", "--policy", "--json"}) })
-	if _, serr := os.Stat(os.Getenv("HOME")); err != nil || !strings.Contains(fmt.Sprint(v["policy"]), "Source code is never collected") || serr == nil {
+	if _, serr := os.Stat(os.Getenv("HOME")); err != nil || !strings.Contains(fmt.Sprint(v["policy"]), "Source code is never collected") || serr == nil ||
+		!regexp.MustCompile(`on this computer: [^\n]*gitfolio`).MatchString(fmt.Sprint(v["setupActions"])) {
 		t.Errorf("policy without git: %v %v (data folder made: %v)", v, err, serr == nil)
 	}
 }

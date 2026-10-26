@@ -78,6 +78,15 @@ type Commit struct {
 const repoFormat = 3
 
 func dataDir() (string, error) {
+	dir, err := dataPath()
+	if err != nil {
+		return "", err
+	}
+	return dir, os.MkdirAll(dir, 0o700)
+}
+
+// dataPath is the data folder, without making it (dataDir does).
+func dataPath() (string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
@@ -86,8 +95,7 @@ func dataDir() (string, error) {
 	if sourceBuild() { // a build from source keeps its own data, apart from the installed release
 		name = "gitfolio-dev"
 	}
-	dir := filepath.Join(base, name)
-	return dir, os.MkdirAll(dir, 0o700)
+	return filepath.Join(base, name), nil
 }
 
 func newRepo(path string) Repo {

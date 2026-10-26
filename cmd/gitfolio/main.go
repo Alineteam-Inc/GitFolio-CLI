@@ -229,7 +229,8 @@ func run(args []string) error {
 		return cmdGit(args[1:])
 	}
 	if args[0] == "init" && slices.Equal(withoutJSON(args[1:]), []string{"--policy"}) { // a fixed text: before git and the data folder
-		return cmdInit("", args[1:])
+		dir, _ := dataPath() // named in the setup actions, not made
+		return cmdInit(dir, args[1:])
 	}
 	if !gitWorks() && args[0] != "uninstall" && args[0] != "update" { // removing goes as far as it can; updating needs no git
 		if args[0] != "init" || jsonOut || !interactive() || !installGit(detectLang(os.Getenv)) {
