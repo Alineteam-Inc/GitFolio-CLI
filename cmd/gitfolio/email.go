@@ -11,7 +11,8 @@ import (
 // The user's work emails (DESIGN 3.2): commits by any of them, or by a repository's git config
 // user.email, count as the user's own. aline.team gets them all under one author email, the primary: the
 // first in the list. From 0.2.0 aline.team takes a repository's commits only under an email verified for
-// the account (the account email, or a work email verified with a code) or a noreply address, and merges a
+// the account (the account email, or a work email verified with a code) or a GitHub or GitLab noreply
+// address whose account the user linked on aline.team, and merges a
 // repository the user linked on the web under such an email with what GitFolio sends (DESIGN 6.1.2).
 // A repository's git config user.email only tells which commits are the user's.
 
@@ -50,11 +51,60 @@ func verified(creds Credentials, email string) bool {
 }
 
 // noreply reports whether email is a git service's address that hides the real one
-// (id+login@users.noreply.github.com, users.noreply.gitlab.com or a GitLab server's). It cannot receive
-// a code, and aline.team takes commits under it without one.
+// (id+login@users.noreply.github.com, users.noreply.gitlab.com or a GitLab server's). It cannot receive a code.
 func noreply(email string) bool {
 	_, domain, _ := strings.Cut(strings.ToLower(email), "@")
 	return strings.HasPrefix(domain, "users.noreply.")
+}
+
+// verifyBy says how aline.team comes to take commits under email: "" once verified, "code" with a code
+// sent to it, "github" or "gitlab" once the account a noreply address numbers is linked on aline.team
+// (it checks that on upload, so it may be linked already), "none" for a noreply address it never takes
+// (the older form without the number, or a GitLab server's).
+func verifyBy(creds Credentials, email string) string {
+	local, domain, _ := strings.Cut(strings.ToLower(email), "@")
+	numbered := func(sep string) bool {
+		id, _, ok := strings.Cut(local, sep)
+		return ok && id != "" && strings.Trim(id, "0123456789") == ""
+	}
+	switch {
+	case verified(creds, email):
+		return ""
+	case !noreply(email):
+		return "code"
+	case domain == "users.noreply.github.com" && numbered("+"):
+		return "github"
+	case domain == "users.noreply.gitlab.com" && numbered("-"):
+		return "gitlab"
+	}
+	return "none"
+}
+
+// linkURL is the aline.team page that links a GitHub or GitLab account, so its noreply address is taken.
+func (c *client) linkURL() string {
+	return strings.TrimSuffix(c.base, "/api") + "/settings/manage-git"
+}
+
+// verifyJSON adds to m, for a program, how aline.team comes to take email (verifyBy, null once verified)
+// and, for a noreply address, the page that links its account (verifyUrl).
+func (c *client) verifyJSON(m map[string]any, email string) map[string]any {
+	by := verifyBy(c.creds, email)
+	m["verifyBy"] = nil
+	if by != "" {
+		m["verifyBy"] = by
+	}
+	if by == "github" || by == "gitlab" {
+		m["verifyUrl"] = c.linkURL()
+	}
+	return m
+}
+
+// noreplyFailure is the error for a code asked for a noreply address: how aline.team comes to take it.
+func (c *client) noreplyFailure(email string) error {
+	if by := verifyBy(Credentials{}, email); by != "none" {
+		return failure("emailNoreply", email, providerNames[strings.ToUpper(by)], c.linkURL())
+	}
+	return failure("emailNoreplyNone", email)
 }
 
 // emailList shows the work emails, the primary marked with ★ and, when logged in, the verified ones with ✔.
@@ -117,7 +167,7 @@ func cmdEmail(dir string, args []string) error {
 	}
 	if len(args) == 0 {
 		if jsonOut {
-			return emailsJSON(cfg, c.creds)
+			return emailsJSON(cfg, c)
 		}
 		show(out, emailList(lang, cfg, c.creds))
 		return nil
@@ -146,7 +196,7 @@ func cmdEmail(dir string, args []string) error {
 			return failure("emailBad", e)
 		}
 		if noreply(e) {
-			return failure("emailNoreply", e)
+			return c.noreplyFailure(e)
 		}
 		if !c.ensureLogin() {
 			return failure("loginFirst")
@@ -207,7 +257,7 @@ func cmdEmail(dir string, args []string) error {
 		return err
 	}
 	if jsonOut {
-		return emailsJSON(cfg, c.creds)
+		return emailsJSON(cfg, c)
 	}
 	show(out, done+emailList(lang, cfg, c.creds))
 	return nil
@@ -218,11 +268,11 @@ func finishEmailCode(dir string, c *client, e, code string) error {
 	return finishKept(dir, "email", e, code, func(s codeStart) error { return c.finishEmailCheck(s, code) })
 }
 
-// emailsJSON is the work emails for a program: the primary first, each verified or not.
-func emailsJSON(cfg Config, creds Credentials) error {
+// emailsJSON is the work emails for a program: the primary first, each verified or not, and how to have it taken.
+func emailsJSON(cfg Config, c *client) error {
 	list := []map[string]any{}
 	for i, e := range cfg.Emails {
-		list = append(list, map[string]any{"email": e, "primary": i == 0, "verified": verified(creds, e), "noreply": noreply(e)})
+		list = append(list, c.verifyJSON(map[string]any{"email": e, "primary": i == 0, "verified": verified(c.creds, e), "noreply": noreply(e)}, e))
 	}
 	return printJSON(map[string]any{"emails": list})
 }

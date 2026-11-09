@@ -823,7 +823,11 @@ func cmdList(dir string) error {
 	if err != nil {
 		return err
 	}
-	waitingNotice(detectLang(os.Getenv), st.Waiting) // also after pushes, which send in the background
+	c, err := newClient(dir)
+	if err != nil {
+		return err
+	}
+	waitingNotice(detectLang(os.Getenv), c, st.Waiting) // also after pushes, which send in the background
 	return nil
 }
 

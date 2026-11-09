@@ -20,6 +20,8 @@ remove, purge or change settings yourself.
    - `waitingForVerifiedEmail`: aline.team takes that repository only after its email is verified.
      `gitfolio email` shows which email; verify it with `gitfolio email verify <email>`, or send the
      code with `email_start` if the user wants you to (they enter it in the app or a terminal, not here).
+     A noreply address gets no code: aline.team takes it once the user links its GitHub or GitLab account
+     there, at the page `gitfolio sync` (or `email_start`) names.
    - `syncMode` is `local`: nothing is sent by itself; statistics go when the user asks for their type
      or portfolio, or runs `gitfolio sync`. `gitfolio config autosync on` sends after every push.
    - Commits here but fewer on aline.team, no error: run `gitfolio sync --dry-run` to see what would go,

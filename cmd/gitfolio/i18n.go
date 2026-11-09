@@ -485,9 +485,14 @@ var messages = map[string]map[string]string{
 		"ja": "%s の認証をスキップしました。後で `gitfolio email verify` で認証してください。\n",
 	},
 	"emailNoreply": {
-		"en": "%s is a noreply address: it cannot receive a code, and aline.team needs none for it.\n",
-		"ko": "%s은(는) noreply 주소라 코드를 받을 수 없고, aline.team도 인증을 요구하지 않습니다.\n",
-		"ja": "%s は noreply アドレスのためコードを受け取れず、aline.team も認証を求めません。\n",
+		"en": "%s is a noreply address: it cannot receive a code. aline.team takes commits under it once you link the %s account it belongs to: %s\n",
+		"ko": "%s은(는) noreply 주소라 코드를 받을 수 없습니다. 이 주소의 %s 계정을 aline.team에 연동하면 그 커밋을 받습니다: %s\n",
+		"ja": "%s は noreply アドレスのためコードを受け取れません。このアドレスの %s アカウントを aline.team に連携すると、そのコミットを受け付けます: %s\n",
+	},
+	"emailNoreplyNone": {
+		"en": "%s is a noreply address aline.team does not take (the older form without the account's number, or a GitLab server's),\nand it cannot receive a code. Commit with an email you can verify.\n",
+		"ko": "%s은(는) aline.team이 받지 않는 noreply 주소입니다(계정 번호가 없는 옛 형식이거나 GitLab 서버의 주소).\n코드도 받을 수 없으니 인증할 수 있는 이메일로 커밋하세요.\n",
+		"ja": "%s は aline.team が受け付けない noreply アドレスです(アカウント番号のない古い形式か、GitLab サーバーのアドレス)。\nコードも受け取れないため、認証できるメールアドレスでコミットしてください。\n",
 	},
 	"emailCandidates": {
 		"en": "Emails git uses for commits in these folders (repositories using each):\n",
@@ -510,9 +515,9 @@ var messages = map[string]map[string]string{
 		"ja": "aline.team はアカウントで認証済みのメールアドレスのコミットのみを受け付けます。以下のアドレスに順にコードを送ります。\n(Enter = スキップ、後で `gitfolio email verify` で認証)\n",
 	},
 	"emailCheckOnce": {
-		"en": "Since GitFolio 0.2.0, aline.team takes commits only under emails verified for your account\n(GitHub and GitLab noreply addresses need none). Not verified yet: %s\n",
-		"ko": "GitFolio 0.2.0부터 aline.team은 계정에 인증된 이메일의 커밋만 받습니다.\n(GitHub·GitLab noreply 주소는 인증 불필요) 아직 인증하지 않은 이메일: %s\n",
-		"ja": "GitFolio 0.2.0 から、aline.team はアカウントで認証済みのメールアドレスのコミットのみを受け付けます。\n(GitHub・GitLab の noreply アドレスは不要) まだ認証していないアドレス: %s\n",
+		"en": "Since GitFolio 0.2.0, aline.team takes commits only under emails verified for your account\n(a GitHub or GitLab noreply address once its account is linked on aline.team). Not verified yet: %s\n",
+		"ko": "GitFolio 0.2.0부터 aline.team은 계정에 인증된 이메일의 커밋만 받습니다.\n(GitHub·GitLab noreply 주소는 그 계정을 aline.team에 연동하면 받음) 아직 인증하지 않은 이메일: %s\n",
+		"ja": "GitFolio 0.2.0 から、aline.team はアカウントで認証済みのメールアドレスのコミットのみを受け付けます。\n(GitHub・GitLab の noreply アドレスは、そのアカウントを aline.team に連携すると受け付け) まだ認証していないアドレス: %s\n",
 	},
 	"emailVerifyNow": {
 		"en": "Verify them now with an email code?",
@@ -523,6 +528,16 @@ var messages = map[string]map[string]string{
 		"en": "Not sent yet: aline.team takes these repositories only after %s is verified for your account.\n  %s\nVerify it with `gitfolio email verify %s`; the next push or sync sends them.\n",
 		"ko": "아직 보내지 않았습니다: %s을(를) 계정에 인증해야 aline.team이 아래 저장소를 받습니다.\n  %s\n`gitfolio email verify %s`로 인증하면 다음 push나 sync 때 보냅니다.\n",
 		"ja": "まだ送信していません: %s をアカウントで認証すると、aline.team が以下のリポジトリを受け付けます。\n  %s\n`gitfolio email verify %s` で認証すると、次の push か sync で送信します。\n",
+	},
+	"sendWaitingLink": {
+		"en": "Not sent yet: aline.team takes these repositories under %s once you link the %s account it belongs to.\n  %s\nLink it at %s; the next push or sync sends them.\n",
+		"ko": "아직 보내지 않았습니다: %s의 %s 계정을 aline.team에 연동해야 아래 저장소를 받습니다.\n  %s\n%s 에서 연동하면 다음 push나 sync 때 보냅니다.\n",
+		"ja": "まだ送信していません: %s の %s アカウントを aline.team に連携すると、以下のリポジトリを受け付けます。\n  %s\n%s で連携すると、次の push か sync で送信します。\n",
+	},
+	"sendWaitingNone": {
+		"en": "Not sent yet: aline.team does not take commits under %s, a noreply address without the account's number\nor a GitLab server's.\n  %s\n",
+		"ko": "아직 보내지 않았습니다: %s은(는) aline.team이 받지 않는 noreply 주소입니다(계정 번호가 없는 옛 형식이거나 GitLab 서버의 주소).\n  %s\n",
+		"ja": "まだ送信していません: %s は aline.team が受け付けない noreply アドレスです(アカウント番号のない古い形式か、GitLab サーバーのアドレス)。\n  %s\n",
 	},
 	"purgeShared": {
 		"en": "Its commits were deleted here. Another registered repository has the same address (%s), so aline.team keeps it.\n",

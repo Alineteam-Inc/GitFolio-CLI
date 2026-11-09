@@ -682,14 +682,13 @@ func reportSync(dir, lang string, n syncCounts, failed []map[string]string) erro
 	if err != nil {
 		return err
 	}
+	c, err := newClient(dir)
+	if err != nil {
+		return err
+	}
 	if jsonOut {
-		waiting := []map[string]string{} // repositories aline.team takes once the email is verified
-		for _, key := range slices.Sorted(maps.Keys(st.Waiting)) {
-			_, namespace, _ := strings.Cut(key, "/")
-			waiting = append(waiting, map[string]string{"namespace": namespace, "email": st.Waiting[key]})
-		}
 		return printJSON(map[string]any{"commits": n.commits, "deleted": n.deletes, "moved": n.moves, "stats": n.stats,
-			"deps": n.deps, "depsCleared": n.depsCleared, "noRemote": n.noRemote, "waiting": waiting, "failed": failed})
+			"deps": n.deps, "depsCleared": n.depsCleared, "noRemote": n.noRemote, "waiting": c.waitingJSON(st.Waiting), "failed": failed})
 	}
 	switch {
 	case n.commits+n.deletes > 0:
@@ -712,18 +711,38 @@ func reportSync(dir, lang string, n syncCounts, failed []map[string]string) erro
 	if n.noRemote > 0 {
 		say(lang, "noRemote", n.noRemote)
 	}
-	waitingNotice(lang, st.Waiting)
+	waitingNotice(lang, c, st.Waiting)
 	return nil
 }
 
-// waitingNotice tells, once per email, which repositories aline.team takes only after it is verified.
-func waitingNotice(lang string, waiting map[string]string) {
+// waitingNotice tells, once per email, which repositories aline.team takes only after it is verified, or
+// for a noreply address after its account is linked.
+func waitingNotice(lang string, c *client, waiting map[string]string) {
 	byEmail := map[string][]string{}
 	for key, email := range waiting {
 		_, namespace, _ := strings.Cut(key, "/")
 		byEmail[email] = append(byEmail[email], namespace)
 	}
 	for _, email := range slices.Sorted(maps.Keys(byEmail)) {
-		warn(lang, "sendWaiting", email, strings.Join(slices.Sorted(slices.Values(byEmail[email])), ", "), email)
+		repos := strings.Join(slices.Sorted(slices.Values(byEmail[email])), ", ")
+		switch by := verifyBy(Credentials{}, email); by {
+		case "github", "gitlab":
+			warn(lang, "sendWaitingLink", email, providerNames[strings.ToUpper(by)], repos, c.linkURL())
+		case "none":
+			warn(lang, "sendWaitingNone", email, repos)
+		default:
+			warn(lang, "sendWaiting", email, repos, email)
+		}
 	}
+}
+
+// waitingJSON is the repositories aline.team takes once an email is verified, for a program: each with
+// the email and how to have it taken.
+func (c *client) waitingJSON(waiting map[string]string) []map[string]any {
+	list := []map[string]any{}
+	for _, key := range slices.Sorted(maps.Keys(waiting)) {
+		_, namespace, _ := strings.Cut(key, "/")
+		list = append(list, c.verifyJSON(map[string]any{"namespace": namespace, "email": waiting[key]}, waiting[key]))
+	}
+	return list
 }

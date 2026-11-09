@@ -132,6 +132,15 @@ func TestStatusSyncJSON(t *testing.T) {
 	if r := list[0].(map[string]any); r["namespace"] != "me/app" || r["commits"] != 1.0 || r["sent"] != 1.0 || r["hooks"] != "off" {
 		t.Errorf("repository: %v", r)
 	}
+	// What waits, and how to have it taken: a repository removed since the last sync no longer waits.
+	st, _ := loadSync(dir)
+	st.Waiting = map[string]string{"GITHUB/me/app": "me@work.com", "GITHUB/me/gone": "1+me@users.noreply.github.com"}
+	if err := saveSync(dir, st); err != nil {
+		t.Fatal(err)
+	}
+	if w, _ := status()["waiting"].([]any); len(w) != 1 || w[0].(map[string]any)["namespace"] != "me/app" || w[0].(map[string]any)["verifyBy"] != "code" {
+		t.Errorf("waiting: %v", w)
+	}
 	ts.Close() // a new commit pushed while aline.team cannot be reached
 	for _, args := range [][]string{{"-c", "user.email=dev@example.com", "-c", "user.name=x", "commit", "-q", "--allow-empty", "-m", "fix: more"},
 		{"update-ref", "refs/remotes/origin/main", "HEAD"}} {

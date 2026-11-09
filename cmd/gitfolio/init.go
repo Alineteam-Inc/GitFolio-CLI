@@ -297,8 +297,8 @@ func initScan(dir string, args []string) error {
 		if slices.ContainsFunc(list, func(m map[string]any) bool { return m["email"] == e }) {
 			continue
 		}
-		list = append(list, map[string]any{"email": e, "repositories": uses[e], "work": slices.Contains(cfg.Emails, e),
-			"verified": verified(c.creds, e), "noreply": noreply(e)})
+		list = append(list, c.verifyJSON(map[string]any{"email": e, "repositories": uses[e], "work": slices.Contains(cfg.Emails, e),
+			"verified": verified(c.creds, e), "noreply": noreply(e)}, e))
 	}
 	return printJSON(map[string]any{"roots": roots, "repositories": repos, "emails": list})
 }

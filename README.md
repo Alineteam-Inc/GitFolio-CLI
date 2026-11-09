@@ -133,7 +133,8 @@ Or ask your AI tool, for example:
   created it; for files you created, when someone else first changed them (path and time only). All
   under one email, your primary work email (`gitfolio email`).
 - **Only under emails you verified:** aline.team takes your commits under an email verified with a code
-  sent to it (`gitfolio init`, `gitfolio email verify`), or a GitHub or GitLab noreply address.
+  sent to it (`gitfolio init`, `gitfolio email verify`), or a GitHub or GitLab noreply address once you link
+  its account on aline.team (https://aline.team/settings/manage-git).
 - **Your account and this computer:** your email and the work emails you verify; at login, the OS and
   CPU type (e.g. `macOS arm64`), screen language and time zone; with every request, the GitFolio
   version, OS and CPU type.
@@ -318,7 +319,7 @@ gitfolio status                  # 저장소별로 모은 내용
   마스킹), AI 에이전트 사용 여부와 종류, 파일마다 저장소 안 경로·추가·삭제 줄 수·이 커밋에서 새로 만든 파일인지,
   내가 만든 파일을 다른 사람이 처음 고친 시각(경로와 시각만)도 보냅니다. 모두 대표 작업 이메일(`gitfolio email`) 하나로 보냅니다.
 - **인증한 이메일로만:** aline.team은 메일로 받은 코드로 인증한 이메일(`gitfolio init`, `gitfolio email verify`)이나
-  GitHub·GitLab noreply 주소로 쓴 커밋만 받습니다.
+  GitHub·GitLab noreply 주소(그 계정을 aline.team에 연동한 경우, https://aline.team/settings/manage-git)로 쓴 커밋만 받습니다.
 - **계정과 이 컴퓨터:** 계정 이메일과 인증한 작업 이메일, 로그인할 때 OS·CPU 종류(예: `macOS arm64`)·화면 언어·시간대,
   요청마다 GitFolio 버전·OS·CPU 종류
 - **AI 코딩 도구**(`gitfolio mcp`)는 저장소마다 내가 허용한 만큼만 봅니다(`gitfolio config ai`). 저장소 실제 이름(기본)·익명·

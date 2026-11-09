@@ -774,7 +774,7 @@ func mcpEmailStart(dir string, args map[string]any) (any, error) {
 		return nil, errors.New("not logged in: call login_start first")
 	}
 	if noreply(email) { // as email verify: no code can reach it
-		return nil, failure("emailNoreply", email)
+		return nil, c.noreplyFailure(email)
 	}
 	if err := withLock(dir, func() error {
 		cfg, err := loadConfig(dir)

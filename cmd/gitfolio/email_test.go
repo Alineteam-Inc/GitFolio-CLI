@@ -140,6 +140,26 @@ func TestNoreply(t *testing.T) {
 	if !strings.Contains(got, "(noreply)") || strings.Contains(got, "verify") {
 		t.Errorf("a noreply address is shown as one to verify:\n%s", got)
 	}
+	// aline.team takes a noreply address once the account its number names is linked there.
+	c := &client{base: "https://aline.team/api", creds: Credentials{Email: "a@b.c", Verified: []string{"9+me@users.noreply.github.com"}}}
+	for e, want := range map[string]string{
+		"a@b.c":                              "",
+		"9+me@users.noreply.github.com":      "", // stored by aline.team: linked already
+		"me@work.com":                        "code",
+		"123+me@users.noreply.github.com":    "github",
+		"12-me@users.noreply.gitlab.com":     "gitlab",
+		"me@users.noreply.github.com":        "none", // older form: no number
+		"x+me@users.noreply.github.com":      "none",
+		"7-me@users.noreply.git.example.com": "none", // a GitLab server of its own
+	} {
+		m := c.verifyJSON(map[string]any{}, e)
+		if by, _ := m["verifyBy"].(string); by != want {
+			t.Errorf("verifyBy(%q) = %v, want %q", e, m["verifyBy"], want)
+		}
+		if url, _ := m["verifyUrl"].(string); (url != "") != (want == "github" || want == "gitlab") || (url != "" && url != "https://aline.team/settings/manage-git") {
+			t.Errorf("verifyUrl(%q) = %q", e, url)
+		}
+	}
 }
 
 // The emails git uses in the found repositories are offered: the global one first, then each

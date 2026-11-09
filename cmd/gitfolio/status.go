@@ -225,7 +225,11 @@ func cmdStatus(dir string, args []string) error {
 			}
 		}
 		if key := r.Provider + "/" + r.Namespace; st.Waiting[key] != "" {
-			waitingNotice(lang, map[string]string{key: st.Waiting[key]})
+			c, err := newClient(dir)
+			if err != nil {
+				return err
+			}
+			waitingNotice(lang, c, map[string]string{key: st.Waiting[key]})
 		}
 		return nil
 	}
@@ -249,7 +253,11 @@ func cmdStatus(dir string, args []string) error {
 	header, rows, _ := strings.Cut(b.String(), "\n")
 	title := strings.TrimRight(fmt.Sprintf(tr(lang, "statusTitle"), len(repos)), "\n")
 	show(out, title+"\n"+dim(strings.TrimRight(header, " "))+"\n"+gitLines(rows))
-	waitingNotice(lang, st.Waiting)
+	c, err := newClient(dir)
+	if err != nil {
+		return err
+	}
+	waitingNotice(lang, c, st.Waiting)
 	notice(tr(lang, "statusMore"))
 	return nil
 }
@@ -271,7 +279,7 @@ func statusJSON(dir string, repos []Repo, commits []Commit, st syncState, cfg Co
 		Hooks      string `json:"hooks"`   // on, off, or manual: a hooks folder GitFolio does not write to
 		LastCommit string `json:"lastCommit,omitempty"`
 	}
-	list, unsent, hooks := []repo{}, 0, make([]string, len(repos))
+	list, unsent, hooks, waiting := []repo{}, 0, make([]string, len(repos)), map[string]string{}
 	sideBySide(len(repos), func(i int) { hooks[i] = hookStatus(repos[i].Path) })
 	for i, r := range repos {
 		s := statusOf(r, commits, nil, st)
@@ -279,8 +287,11 @@ func statusJSON(dir string, repos []Repo, commits []Commit, st syncState, cfg Co
 		if !s.last.IsZero() {
 			last = s.lastCommit()
 		}
-		list = append(list, repo{r.Name, r.Path, r.Namespace, s.commits, s.sent, st.Waiting[r.Provider+"/"+r.Namespace] != "",
-			hooks[i], last})
+		key := r.Provider + "/" + r.Namespace
+		list = append(list, repo{r.Name, r.Path, r.Namespace, s.commits, s.sent, st.Waiting[key] != "", hooks[i], last})
+		if st.Waiting[key] != "" { // a repository removed since the last sync no longer waits
+			waiting[key] = st.Waiting[key]
+		}
 		if r.Namespace != "" {
 			unsent += s.commits - s.sent
 		}
@@ -294,7 +305,7 @@ func statusJSON(dir string, repos []Repo, commits []Commit, st syncState, cfg Co
 		mode = "local" // commits are never sent: unsent only counts in automatic mode
 	}
 	return printJSON(map[string]any{"account": account, "setUp": c.loggedIn() && len(repos) > 0, "syncMode": mode,
-		"lastSync": st.LastSync, "lastSyncError": st.LastError, "unsent": unsent, "repositories": list})
+		"lastSync": st.LastSync, "lastSyncError": st.LastError, "unsent": unsent, "repositories": list, "waiting": c.waitingJSON(waiting)})
 }
 
 // repoJSON is status <name> --json: what the text shows of one repository. dependencies is null while
