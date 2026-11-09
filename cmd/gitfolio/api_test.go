@@ -287,6 +287,10 @@ func (f *fakeAline) handler() http.Handler {
 			fail(w, 400, "A014")
 			return
 		}
+		if at, err := time.Parse(time.RFC3339, in.AsOf); err == nil && at.After(time.Now().Add(24*time.Hour)) {
+			fail(w, 400, "A018")
+			return
+		}
 		if e := f.waitFor[in.Namespace]; e != "" && !slices.Contains(f.me()["verifiedEmails"].([]string), e) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(403)

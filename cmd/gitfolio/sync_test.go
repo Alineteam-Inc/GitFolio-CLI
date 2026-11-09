@@ -655,6 +655,12 @@ func TestSyncSnapshots(t *testing.T) {
 	if n, err := syncData(dir, false); err != nil || n.stats != 1 || f.stats["GITHUB/me/app"].Days["2026-10-09"] == nil || before.Days["2026-10-09"] != nil {
 		t.Errorf("after the update the snapshot was not sent: %+v, %v", n, err)
 	}
+
+	// A snapshot more than a day ahead of aline.team's clock (A018) is skipped like a malformed one: the sync goes on.
+	must(appendCommits(dir, []Commit{commit("r1", "a8", time.Now().Add(72*time.Hour).Format(time.RFC3339))}))
+	if n, err := syncData(dir, false); err != nil || n.commits != 1 || n.stats != 0 {
+		t.Errorf("snapshot ahead of the clock: %+v, %v; want the commit, the snapshot skipped and no error", n, err)
+	}
 }
 
 // A shallow clone made whole (fetch --unshallow) has more commits under the same branch tips: the scan

@@ -473,7 +473,7 @@ func sendPending(dir string, dryRun bool) (n syncCounts, err error) {
 			case errors.As(err, &ae) && ae.Code == codeUnverified:
 				st.Waiting[key] = cmp.Or(strings.ToLower(ae.Email), "?")
 				continue
-			case errors.As(err, &ae) && ae.Code == codeBadInput: // not sent again on every push, until it changes
+			case errors.As(err, &ae) && (ae.Code == codeBadInput || ae.Code == codeAheadOfClock): // not sent again on every push, until it changes
 				warn(lang, "statsRejected", s.Namespace, ae)
 			case errors.As(err, &ae) && ae.Code == codeNewerFormat: // all snapshots wait for the update
 				warn(lang, "statsUpdate")

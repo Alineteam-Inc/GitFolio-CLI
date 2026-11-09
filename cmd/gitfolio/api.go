@@ -80,6 +80,7 @@ const (
 	codeTooManyEmails = "A012" // the account has as many verified work emails as it may have
 	codeUnverified    = "A013" // a repository's commits wait until error.email is verified (from 0.2.0)
 	codeNewerFormat   = "A014" // aline.team takes a newer snapshot format: GitFolio needs an update
+	codeAheadOfClock  = "A018" // a snapshot's asOf more than a day ahead of aline.team's clock
 	codeRateLimited   = "R001"
 	codeBadInput      = "C001" // malformed request
 	codeNoPath        = "C004" // no such path: a server without that feature yet
