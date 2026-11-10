@@ -468,7 +468,12 @@ func storeScan(dir string, cfg Config, r *Repo, g repoRead, rebuild bool, regist
 		if err != nil {
 			return 0, err
 		}
-		stored = slices.DeleteFunc(stored, func(c Commit) bool { return c.Repo == r.ID })
+		inRange := map[string]bool{}
+		for _, c := range all {
+			inRange[c.Hash] = true
+		}
+		// Pushed commits no remote branch has any more (squashed, branch deleted) exist only here: kept.
+		stored = slices.DeleteFunc(stored, func(c Commit) bool { return c.Repo == r.ID && (c.Branch == "" || inRange[c.Hash]) })
 		if err := writeCommits(dir, stored); err != nil {
 			return 0, err
 		}

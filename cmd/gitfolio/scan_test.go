@@ -357,6 +357,9 @@ func TestOldFormatRescanned(t *testing.T) {
 	}
 	commits, _ := readCommits(data)
 	commits[0].Files[0].Name = "main.go" // as stored before paths were recorded
+	commits = append(commits,
+		Commit{Repo: r.ID, Hash: "0123", Branch: "feature/x", Date: "2026-09-01T12:00:00Z", Message: "squashed away", CreationType: creationHuman},
+		Commit{Repo: r.ID, Hash: "0456", Date: "2026-09-01T12:00:00Z", Message: "never pushed", CreationType: creationHuman})
 	if err := writeCommits(data, commits); err != nil {
 		t.Fatal(err)
 	}
@@ -364,8 +367,11 @@ func TestOldFormatRescanned(t *testing.T) {
 	if _, err := scanRepo(data, &r, false); err != nil {
 		t.Fatal(err)
 	}
-	if commits, _ = readCommits(data); len(commits) != 1 || commits[0].Files[0].Name != "cmd/app/main.go" || r.Format != repoFormat {
-		t.Errorf("after rescan: %+v, format %d", commits, r.Format)
+	commits, _ = readCommits(data)
+	i := slices.IndexFunc(commits, func(c Commit) bool { return c.Message == "start" })
+	if len(commits) != 2 || i < 0 || commits[i].Files[0].Name != "cmd/app/main.go" || r.Format != repoFormat ||
+		!slices.ContainsFunc(commits, func(c Commit) bool { return c.Hash == "0123" }) {
+		t.Errorf("after rescan: %+v, format %d; want start again and the pushed commit no branch has", commits, r.Format)
 	}
 }
 
