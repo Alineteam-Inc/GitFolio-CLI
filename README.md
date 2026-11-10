@@ -166,6 +166,7 @@ gitfolio status [name]           # per repository: commits collected and sent, f
 gitfolio stats [--refresh]       # your developer type and five scores from aline.team (saved here after the first time;
                                  # in local mode it calls the aline.team API each time)
 gitfolio stack                   # how long you used each language, framework and library (worked out here)
+gitfolio work [--from 2025-06]   # what you did per repository: commits, lines, share made with AI and by which agent
 gitfolio portfolio [file.md|file.pdf]
                                  # your portfolio from your git history: developer type, tech stack, repositories
                                  # (Markdown to edit or a PDF printed with Chrome, Edge or Chromium;
@@ -345,6 +346,7 @@ gitfolio status [이름]           # 저장소별 모은 커밋·보낸 수, 파
 gitfolio stats [--refresh]       # aline.team의 개발자 유형과 능력치 다섯 가지 (처음 받은 뒤 이 컴퓨터에 저장.
                                  # 로컬 모드에서는 매번 aline.team API를 호출)
 gitfolio stack                   # 언어·프레임워크·라이브러리별 사용 기간 (이 컴퓨터에서 계산)
+gitfolio work [--from 2025-06]   # 저장소별로 한 작업: 커밋, 줄 수, AI와 함께 만든 비율과 에이전트
 gitfolio portfolio [파일.md|파일.pdf]
                                  # git 이력으로 만든 포트폴리오: 개발자 유형, 기술 스택, 저장소
                                  # (고쳐 쓸 Markdown 또는 Chrome·Edge·Chromium으로 인쇄한 PDF.

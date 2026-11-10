@@ -1353,6 +1353,16 @@ var messages = map[string]map[string]string{
 		"ko": "등록한 저장소로 만든 기술 스택입니다. 각 기술을 쓴 저장소에서 내 첫 커밋부터 마지막 커밋까지:\n",
 		"ja": "登録したリポジトリから作った技術スタックです。各技術を使ったリポジトリでの自分の最初から最後のコミットまで:\n",
 	},
+	"workTitle": {
+		"en": "Your work in %d repositories (this computer's data)\n",
+		"ko": "저장소 %d개에서 한 작업 (이 컴퓨터의 데이터)\n",
+		"ja": "%d 件のリポジトリでの作業(このコンピューターのデータ)\n",
+	},
+	"workNone": {
+		"en": "No commits of yours in the registered repositories for that period.\n",
+		"ko": "그 기간에 등록 저장소의 내 커밋이 없습니다.\n",
+		"ja": "その期間に登録リポジトリのあなたのコミットはありません。\n",
+	},
 	"stackEmpty": {
 		"en": "No tech stack yet. It comes from your commits in the registered repositories (`gitfolio add`).\n",
 		"ko": "아직 기술 스택이 없습니다. 등록한 저장소의 내 커밋에서 만들어집니다(`gitfolio add`).\n",

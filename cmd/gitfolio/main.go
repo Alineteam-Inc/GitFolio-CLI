@@ -70,6 +70,10 @@ commands:
   stack [--json]        how long you used each language, framework and library, worked out on this
                         computer from the registered repositories as aline.team does (no login needed;
                         --json: as JSON, for programs)
+  work [--from <when>] [--to <when>] [--json]
+                        what you did in each repository, all time or from/to a year, month or day
+                        (2025, 2025-06, 2025-06-15): commits, months, lines and the share made with AI,
+                        by agent (this computer's data only; --json: also kinds of commits and work)
   portfolio [file.md|file.pdf] [--from file.md]
                         write your portfolio from your git history: developer type, tech stack and
                         repositories, as Markdown to edit or a PDF printed with Chrome, Edge or
@@ -288,6 +292,8 @@ func run(args []string) error {
 		return cmdStats(dir, args[1:]) // outside the lock: it may wait on aline.team
 	case "stack":
 		return cmdStack(dir, args[1:]) // takes the lock itself, only while reading
+	case "work":
+		return cmdWork(dir, args[1:]) // the same
 	case "portfolio":
 		return cmdPortfolio(dir, args[1:]) // the same; reads this computer's data under the lock
 	case "email":
@@ -329,7 +335,7 @@ func run(args []string) error {
 
 // commands are the commands people type; "hook" is run by git hooks only and never suggested.
 var commands = []string{"init", "login", "logout", "whoami", "add", "remove", "scan", "sync", "list", "status",
-	"stats", "stack", "portfolio", "mcp", "export", "config", "deps", "schedule", "email", "history", "update", "uninstall", "git", "version", "help"}
+	"stats", "stack", "work", "portfolio", "mcp", "export", "config", "deps", "schedule", "email", "history", "update", "uninstall", "git", "version", "help"}
 
 // unknownCommand names the commands the user may have meant (similarCommands), or points to help.
 func unknownCommand(s string) error {

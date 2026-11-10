@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"errors"
+	"flag"
 	"fmt"
 	"maps"
 	"math"
@@ -11,6 +12,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"text/tabwriter"
 	"time"
 )
 
@@ -244,20 +246,94 @@ func mcpWork(dir string, args map[string]any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	var list []workSummary
+	return workOf(repos, byRepo, p, true), nil
+}
+
+// workReport is the work of each repository with commits in the period, the latest first, and the total.
+type workReport struct {
+	Repositories []workSummary `json:"repositories"`
+	Total        workSummary   `json:"total"`
+}
+
+// workOf sums up the work in repos, by the names given there; with branches, the branch names of the
+// repositories config ai shows them for.
+func workOf(repos []Repo, byRepo map[string][]Commit, p period, branches bool) workReport {
+	w := workReport{Repositories: []workSummary{}}
 	var everything []Commit
 	for _, r := range repos {
-		s := summarize(byRepo[r.ID], p, r.AI.Branches)
+		s := summarize(byRepo[r.ID], p, branches && r.AI.Branches)
 		if s.Commits == 0 {
 			continue
 		}
 		s.Repository, s.Service = r.Name, providerNames[r.Provider]
-		list = append(list, s)
+		w.Repositories = append(w.Repositories, s)
 		everything = append(everything, byRepo[r.ID]...)
 	}
-	slices.SortStableFunc(list, func(a, b workSummary) int { return strings.Compare(b.LastCommit, a.LastCommit) })
-	total := summarize(everything, p, false)
-	return map[string]any{"repositories": list, "total": total}, nil
+	slices.SortStableFunc(w.Repositories, func(a, b workSummary) int { return strings.Compare(b.LastCommit, a.LastCommit) })
+	w.Total = summarize(everything, p, false)
+	return w
+}
+
+const workUsage = "gitfolio work [--from <when>] [--to <when>] [--json]"
+
+// cmdWork is gitfolio work: what the user did in each registered repository, all time or in a period,
+// with the share of commits made with AI and by which agent. This computer's data, by the real names.
+func cmdWork(dir string, args []string) error {
+	jsonMode(args)
+	fs := flag.NewFlagSet("work", flag.ContinueOnError)
+	from := fs.String("from", "", "from this year, month or day (2025, 2025-06, 2025-06-15)")
+	to := fs.String("to", "", "to this year, month or day, itself included")
+	fs.Bool("json", false, "print JSON")
+	if err := parseFlags(fs, args, workUsage); err != nil {
+		return err
+	}
+	p, err := parsePeriod(*from, *to)
+	if err != nil || fs.NArg() > 0 {
+		return failure("usage", workUsage)
+	}
+	var repos []Repo
+	var commits []Commit
+	if err := withLock(dir, func() error { // a push may be writing them
+		var err error
+		if repos, err = loadRepos(dir); err != nil {
+			return err
+		}
+		commits, err = readCommits(dir)
+		return err
+	}); err != nil {
+		return err
+	}
+	byRepo := map[string][]Commit{}
+	for _, c := range commits {
+		byRepo[c.Repo] = append(byRepo[c.Repo], c)
+	}
+	w := workOf(repos, byRepo, p, false)
+	if jsonOut {
+		return printJSON(w)
+	}
+	lang := detectLang(os.Getenv)
+	if len(w.Repositories) == 0 {
+		say(lang, "workNone")
+		return nil
+	}
+	var b strings.Builder
+	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "NAME\tCOMMITS\tMONTHS\tLINES\tWITH AI\tAGENTS\tLAST COMMIT")
+	for _, s := range append(w.Repositories, w.Total) {
+		var agents []string
+		for _, a := range slices.Sorted(maps.Keys(s.AIAgents)) {
+			agents = append(agents, fmt.Sprintf("%s %d", a, s.AIAgents[a]))
+		}
+		fmt.Fprintf(tw, "%s\t%d\t%d\t+%d -%d\t%g%%\t%s\t%s\n", cmp.Or(s.Repository, "total"), s.Commits, s.ActiveMonths,
+			s.LinesAdded, s.LinesDeleted, s.WithAI, cmp.Or(strings.Join(agents, ", "), "-"), s.LastCommit)
+	}
+	if err := tw.Flush(); err != nil {
+		return err
+	}
+	header, rows, _ := strings.Cut(b.String(), "\n")
+	title := strings.TrimRight(fmt.Sprintf(tr(lang, "workTitle"), len(w.Repositories)), "\n")
+	show(out, title+"\n"+dim(strings.TrimRight(header, " "))+"\n"+gitLines(rows))
+	return nil
 }
 
 type month struct {

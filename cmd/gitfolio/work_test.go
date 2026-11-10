@@ -192,3 +192,39 @@ func TestCommitsTool(t *testing.T) {
 		t.Error("no repository named, and it answered")
 	}
 }
+
+// gitfolio work is this computer's data for the user and the app: every repository by its real name,
+// hidden from AI tools or not, with the share made with AI and by which agent, in a period.
+func TestWorkCommand(t *testing.T) {
+	dir := t.TempDir()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(saveRepos(dir, []Repo{
+		{ID: "a", Name: "app", Provider: "GITHUB", Namespace: "me/app", AI: aiExposure{Name: "Shop"}},
+		{ID: "b", Name: "secret", Provider: "GITHUB", Namespace: "corp/secret", AI: aiExposure{Hidden: true}},
+	}))
+	must(writeCommits(dir, []Commit{
+		{Repo: "a", Hash: "1", Date: "2025-06-10T12:00:00Z", Message: "feat: pay", CreationType: creationHumanCoAI, AIAgents: []string{"claude-code"}},
+		{Repo: "a", Hash: "2", Date: "2025-07-01T12:00:00Z", Message: "fix: round", CreationType: creationHuman},
+		{Repo: "b", Hash: "3", Date: "2025-07-02T12:00:00Z", Message: "feat: thing", CreationType: creationHuman},
+	}))
+	v, err := jsonStdout(t, func() error { return cmdWork(dir, []string{"--json"}) })
+	jsonOut = false
+	b, _ := json.Marshal(v)
+	if s := string(b); err != nil || !strings.Contains(s, `"repository":"secret"`) || !strings.Contains(s, `"repository":"app"`) ||
+		!strings.Contains(s, `"withAIPercent":50`) || !strings.Contains(s, `"commitsByAIAgent":{"claude-code":1}`) || strings.Contains(s, "Shop") {
+		t.Errorf("work --json = %s, %v", s, err)
+	}
+	v, err = jsonStdout(t, func() error { return cmdWork(dir, []string{"--from", "2025-07", "--json"}) })
+	jsonOut = false
+	if total, _ := v["total"].(map[string]any); err != nil || total["commits"] != 2.0 {
+		t.Errorf("work --from 2025-07 = %v, %v", v, err)
+	}
+	if err := cmdWork(dir, []string{"--from", "June"}); errorCode(err) != "usage" {
+		t.Errorf("a period it cannot read: %v", err)
+	}
+}
