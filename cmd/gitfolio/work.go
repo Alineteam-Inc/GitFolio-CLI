@@ -338,7 +338,7 @@ func mcpCommits(dir string, args map[string]any) (any, error) {
 		limit = min(max(int(v), 1), 500)
 	}
 	if v, ok := args["offset"].(float64); ok {
-		offset = max(int(v), 0)
+		offset = int(min(max(v, 0), 1<<31)) // clamped as a float: a huge one would wrap round as an int
 	}
 	type entry struct {
 		Date      string   `json:"date"`

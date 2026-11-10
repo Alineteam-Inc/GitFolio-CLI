@@ -47,6 +47,9 @@ func TestMCP(t *testing.T) {
 		`{"jsonrpc":"2.0","id":"x","method":"ping"}`,
 		`{"jsonrpc":"2.0","id":8,"method":"resources/list"}`,
 		`{"jsonrpc":"2.0","id":9,"method":"initialize","params":{"protocolVersion":"1999-01-01"}}`,
+		`[{"jsonrpc":"2.0","id":10,"method":"ping"}]`,
+		`{"jsonrpc":"2.0","id":11,"method":123}`,
+		`{"jsonrpc":"2.0","id":12,"method":"ping"}`,
 		`{not json`,
 	}, "\n")
 	var buf bytes.Buffer
@@ -71,7 +74,7 @@ func TestMCP(t *testing.T) {
 		got[string(r.ID)] = r
 		order = append(order, string(r.ID))
 	}
-	if want := "1 2 3 4 5 6 7 \"x\" 8 9 null"; strings.Join(order, " ") != want {
+	if want := "1 2 3 4 5 6 7 \"x\" 8 9 null null 12 null"; strings.Join(order, " ") != want {
 		t.Fatalf("answered %v, want %s (none for the notification)", order, want)
 	}
 	text := func(id string) string {

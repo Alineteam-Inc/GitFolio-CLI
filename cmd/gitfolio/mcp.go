@@ -282,8 +282,14 @@ func serveMCP(dir string, r io.Reader, w io.Writer) error {
 			Method string          `json:"method"`
 			Params json.RawMessage `json:"params"`
 		}
+		var notRequest *json.UnmarshalTypeError // JSON of another shape (a batch, a number for the method): read past
 		if err := dec.Decode(&req); errors.Is(err, io.EOF) {
 			return nil
+		} else if errors.As(err, &notRequest) {
+			if err := reply(json.RawMessage("null"), nil, -32600, "invalid request"); err != nil {
+				return err
+			}
+			continue
 		} else if err != nil { // the stream cannot be read past this
 			return reply(json.RawMessage("null"), nil, -32700, "parse error: "+err.Error())
 		}

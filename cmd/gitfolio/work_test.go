@@ -173,6 +173,9 @@ func TestCommitsTool(t *testing.T) {
 		strings.Contains(s, "Signed-off") || strings.Contains(s, "@") || strings.Contains(s, "h0") || strings.Contains(s, "billing") || strings.Contains(s, "feature/x") {
 		t.Errorf("full messages = %s", s)
 	}
+	if far, err := call(map[string]any{"repository": "app", "offset": 1e19}); err != nil || far["total"] != float64(3) || far["nextOffset"] != nil {
+		t.Errorf("offset past the end = %v, %v", far, err)
+	}
 	if fix, _ := call(map[string]any{"repository": "app", "type": "fix"}); fix["total"] != float64(1) {
 		t.Errorf("fixes only = %v", fix)
 	}
