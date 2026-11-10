@@ -540,7 +540,8 @@ func cmdRemove(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	i := slices.IndexFunc(repos, func(r Repo) bool { return r.Path == top })
+	// Cleaned: Git for Windows writes C:/x, a missing folder's absolute path is C:\x
+	i := slices.IndexFunc(repos, func(r Repo) bool { return filepath.Clean(r.Path) == filepath.Clean(top) })
 	if i < 0 {
 		return failure("notRegistered", tildePath(top))
 	}
