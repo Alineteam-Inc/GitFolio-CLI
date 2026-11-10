@@ -16,13 +16,16 @@ import (
 	"time"
 )
 
-const portfolioUsage = "gitfolio portfolio [file.md|file.pdf] [--from file.md]"
+const portfolioUsage = "gitfolio portfolio [file.md|file.pdf] [--from file.md] [--json]"
 
 // cmdPortfolio writes the user's portfolio from their git history: the developer type and tech stack
 // periods aline.team works out, and the repositories as collected on this computer. Markdown, to edit
 // into a real portfolio, or a PDF printed with a Chrome-family browser: by the file's name, else asked
 // at a terminal (Markdown elsewhere). --from prints a Markdown file instead (one written here and edited, say).
+// With --json and no file, the Markdown itself is printed, for a program to show and save.
 func cmdPortfolio(dir string, args []string) error {
+	jsonMode(args)
+	args = withoutJSON(args)
 	lang := detectLang(os.Getenv)
 	var out, from string
 	for i := 0; i < len(args); i++ {
@@ -36,10 +39,17 @@ func cmdPortfolio(dir string, args []string) error {
 			return wrongWord("portfolio", args[i], []string{"--from"}, portfolioUsage)
 		}
 	}
+	var missing []string
 	switch {
 	case out != "":
 	case from != "":
 		out = strings.TrimSuffix(from, filepath.Ext(from)) + ".pdf"
+	case jsonOut:
+		md, missing, err := portfolioOf(dir, lang, false)
+		if err != nil {
+			return err
+		}
+		return printJSON(map[string]any{"markdown": md, "missing": missing})
 	case interactive() && askPDF(lang):
 		out = "portfolio.pdf"
 	default:
@@ -71,20 +81,26 @@ func cmdPortfolio(dir string, args []string) error {
 		if base, err = filepath.Abs(filepath.Dir(from)); err != nil { // its pictures are found next to it
 			return err
 		}
-	} else if md, err = portfolioOf(dir, lang, false); err != nil {
+	} else if md, missing, err = portfolioOf(dir, lang, false); err != nil {
 		return err
 	}
-	if !pdf {
-		if err := os.WriteFile(out, []byte(md), 0o644); err != nil {
-			return err
+	format, saved := "md", "portfolioSaved"
+	if pdf {
+		format, saved = "pdf", "portfolioSavedPDF"
+		err = printPDF(portfolioPage(lang, md, base), out)
+	} else {
+		err = os.WriteFile(out, []byte(md), 0o644)
+	}
+	if err != nil {
+		return err
+	}
+	if jsonOut {
+		if missing == nil { // --from: printed as it is
+			missing = []string{}
 		}
-		say(lang, "portfolioSaved", tildePath(out))
-		return nil
+		return printJSON(map[string]any{"path": out, "format": format, "missing": missing})
 	}
-	if err := printPDF(portfolioPage(lang, md, base), out); err != nil {
-		return err
-	}
-	say(lang, "portfolioSavedPDF", tildePath(out))
+	say(lang, saved, tildePath(out))
 	return nil
 }
 
@@ -105,19 +121,20 @@ func askPDF(lang string) bool {
 }
 
 // portfolioOf is the portfolio in Markdown. In local mode the statistics go first, as for gitfolio
-// stats. A part aline.team cannot give now is left out with a warning. For AI tools (ai) the
-// repositories are as config ai lets them see them.
-func portfolioOf(dir, lang string, ai bool) (string, error) {
+// stats. A part it has nothing for now is left out, and named in missing: "devType" (aline.team could
+// not give one, or has none yet), "techStack" (none, or without the dependencies, which could not be
+// read). For AI tools (ai) the repositories are as config ai lets them see them.
+func portfolioOf(dir, lang string, ai bool) (md string, missing []string, err error) {
 	c, err := newClient(dir)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if !c.ensureLogin() {
-		return "", failure("loginFirst")
+		return "", nil, failure("loginFirst")
 	}
 	local, err := sendIfLocal(dir, lang, c)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	var repos []Repo
 	var commits []Commit
@@ -129,22 +146,29 @@ func portfolioOf(dir, lang string, ai bool) (string, error) {
 		commits, err = readCommits(dir)
 		return err
 	}); err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if ai {
 		repos = aiView(lang, repos)
 	}
+	missing = []string{}
 	d, _, err := devTypeNow(dir, lang, c, local)
 	if err != nil { // what was kept may be another account's, last year's or in another language
 		warn(lang, "portfolioNoType", err)
 		d = devTypeCache{}
+	}
+	if d.Detail.Title == "" {
+		missing = append(missing, "devType")
 	}
 	deps, err := loadDeps(dir)
 	if err != nil {
 		warn(lang, "portfolioNoStack", err)
 	}
 	u := localStack(repos, commits, deps) // of the repositories shown (aiView for AI tools)
-	return portfolioMarkdown(lang, time.Now(), d, u, repos, commits), nil
+	if err != nil || len(u.Languages)+len(u.Frameworks)+len(u.Libraries) == 0 {
+		missing = append(missing, "techStack")
+	}
+	return portfolioMarkdown(lang, time.Now(), d, u, repos, commits), missing, nil
 }
 
 // portfolioMarkdown lays the portfolio out: who the user is as a developer, the tech stack, then the

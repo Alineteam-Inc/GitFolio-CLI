@@ -3,12 +3,14 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -149,12 +151,30 @@ func TestPortfolio(t *testing.T) {
 	if err := cmdPortfolio(dir, nil); err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Errorf("an existing portfolio was written over without asking: %v", err)
 	}
+	// For a program: the Markdown itself without a file, else the file written; and what is missing.
+	v, err := jsonStdout(t, func() error { return cmdPortfolio(dir, []string{"--json"}) })
+	if missing, _ := v["missing"].([]any); err != nil || !strings.Contains(fmt.Sprint(v["markdown"]), "**KEEPER**") || missing == nil || len(missing) != 0 {
+		t.Errorf("portfolio --json = %v, %v", v, err)
+	}
+	v, err = jsonStdout(t, func() error { return cmdPortfolio(dir, []string{"cv.md", "--json"}) })
+	if err != nil || v["path"] != filepath.Join(work, "cv.md") || v["format"] != "md" {
+		t.Errorf("portfolio cv.md --json = %v, %v", v, err)
+	}
+	jsonOut = false
 	for _, args := range [][]string{{"--from", "a.md", "b.md"}, {"--all"}, {"a.md", "b.md"}} {
 		if err := cmdPortfolio(dir, args); err == nil || !strings.Contains(err.Error(), "Usage") {
 			t.Errorf("portfolio %v: %v", args, err)
 		}
 	}
 
+	if runtime.GOOS == "linux" { // other systems also look in their usual folders, where one may be
+		t.Setenv("CHROME_PATH", "")
+		t.Setenv("PATH", "")
+		if err := cmdPortfolio(dir, []string{"cv.pdf", "--json"}); errorCode(err) != "portfolioNoBrowser" {
+			t.Errorf("a PDF without a browser: %v", err)
+		}
+		jsonOut = false
+	}
 	t.Setenv("CHROME_PATH", filepath.Join(work, "no-such-browser"))
 	if err := cmdPortfolio(dir, []string{"cv.pdf"}); err == nil {
 		t.Error("a PDF without a browser")
@@ -204,7 +224,7 @@ func TestPortfolioWithoutAnotherAccountsType(t *testing.T) {
 	if err := saveJSON(filepath.Join(dir, devTypeFile), other); err != nil {
 		t.Fatal(err)
 	}
-	if md, err := portfolioOf(dir, "en", false); err != nil || strings.Contains(md, "ARCHITECT") {
-		t.Errorf("portfolio with aline.team down: %v\n%s", err, md)
+	if md, missing, err := portfolioOf(dir, "en", false); err != nil || strings.Contains(md, "ARCHITECT") || !slices.Contains(missing, "devType") {
+		t.Errorf("portfolio with aline.team down: %v, missing %v\n%s", err, missing, md)
 	}
 }

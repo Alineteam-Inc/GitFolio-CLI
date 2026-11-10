@@ -477,7 +477,8 @@ func mcpStack(dir string, _ map[string]any) (any, error) {
 }
 
 func mcpPortfolio(dir string, _ map[string]any) (any, error) {
-	return portfolioOf(dir, detectLang(os.Getenv), true)
+	md, _, err := portfolioOf(dir, detectLang(os.Getenv), true)
+	return md, err
 }
 
 // aiView is the registered repositories as AI tools see them (config ai): hidden ones left out, the
