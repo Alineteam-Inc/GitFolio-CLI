@@ -30,9 +30,9 @@ ask, and never guess an email, a code or a repository.
 4. **Repositories.** Ask which repositories to register (suggest the current one). Tell them each gets git
    hooks (post-commit, pre-push) on this computer only: nothing is added to the repository or its remote,
    and `gitfolio remove` undoes it. Call `add_repository` for each. If a repository's git email is not the account's, offer
-   `email_start`: aline.team takes commits only under verified emails. The user enters that code in the
-   app or a terminal too (`enterCode`), never here. A noreply address gets no code: `email_start` names the
-   aline.team page where the user links its GitHub or GitLab account instead.
+   `email_start`: aline.team takes commits only under verified emails. Ask for that code and call
+   `email_verify`, or let the user enter it in the app or a terminal (`enterCode`). A noreply address gets
+   no code: `email_start` names the aline.team page where the user links its GitHub or GitLab account instead.
 5. **What AI tools may see**, for each repository:
    - First read the codebase's own rules: `CLAUDE.md`, `AGENTS.md`, `.cursor/rules`, `CONTRIBUTING`,
      security or confidentiality notes. Note anything about company or customer names, confidential

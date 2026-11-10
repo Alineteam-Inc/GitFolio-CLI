@@ -205,11 +205,23 @@ var mcpSetupTools = []mcpTool{
 		Name:  "email_start",
 		Title: "Add a work email",
 		Description: "Add another email the user commits with (a repository's git user.email that is not their account email) " +
-			"and send it a code; aline.team takes a repository's commits only under verified emails. Never ask for the " +
-			"code: the user enters it in the GitFolio app or in a terminal (enterCode in the result).",
+			"and send it a code; aline.team takes a repository's commits only under verified emails. Then the user gives " +
+			"you the code (email_verify) or enters it in the GitFolio app or a terminal (enterCode in the result).",
 		InputSchema: object(map[string]any{"email": prop("string", "The work email, as the user gave it.")}, "email"),
 		Annotations: mcpWrites,
 		run:         mcpEmailStart,
+	},
+	{
+		Name:  "email_verify",
+		Title: "Add a work email: check the code",
+		Description: "Finish verifying a work email with the code from the email email_start sent, when the user gives it " +
+			"to you. A wrong code can be given again a few times.",
+		InputSchema: object(map[string]any{
+			"email": prop("string", "The work email email_start sent the code to."),
+			"code":  prop("string", "The digits from the email, as the user typed them."),
+		}, "email", "code"),
+		Annotations: mcpWrites,
+		run:         mcpEmailVerify,
 	},
 	{
 		Name:  "add_repository",
@@ -799,8 +811,36 @@ func mcpEmailStart(dir string, args map[string]any) (any, error) {
 		return nil, err
 	}
 	return map[string]any{"codeSentTo": email, "codeDigits": s.length,
-		"enterCode": map[string]string{"app": "the GitFolio app, in Account › Git author emails", "terminal": "gitfolio email verify " + email + " --code <code>"},
-		"next":      "Tell the user to enter the code from that email in the GitFolio app or in a terminal (enterCode); never ask for it here."}, nil
+		"enterCode": map[string]string{"here": "email_verify", "app": "the GitFolio app, in Account › Git author emails",
+			"terminal": "gitfolio email verify " + email + " --code <code>"},
+		"next": "Ask the user for the code from that email and call email_verify, or let them enter it in the GitFolio " +
+			"app or a terminal (enterCode) and check with status that nothing waits for this email any more."}, nil
+}
+
+func mcpEmailVerify(dir string, args map[string]any) (any, error) {
+	email, _ := args["email"].(string)
+	code, _ := args["code"].(string)
+	email = strings.ToLower(strings.TrimSpace(email))
+	c, err := newClient(dir)
+	if err != nil {
+		return nil, err
+	}
+	if !c.loggedIn() {
+		return nil, errors.New("not logged in: call login_start first")
+	}
+	if verified(c.creds, email) { // entered in the app or a terminal meanwhile
+		return map[string]any{"verified": true, "email": email}, nil
+	}
+	switch err := finishEmailCode(dir, c, email, strings.TrimSpace(code)); {
+	case wrongCode(err):
+		return nil, errors.New("wrong code: ask the user again")
+	case codeEnded(err):
+		return nil, errors.New("the code expired or was tried too often: call email_start again")
+	case err != nil:
+		return nil, err
+	}
+	return map[string]any{"verified": true, "email": email,
+		"next": "The next push or sync sends the repositories that waited for this email."}, nil
 }
 
 func mcpAddRepository(dir string, args map[string]any) (any, error) {

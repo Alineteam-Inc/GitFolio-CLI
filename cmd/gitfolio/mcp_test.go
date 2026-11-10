@@ -315,9 +315,6 @@ func TestMCPSetup(t *testing.T) {
 		!strings.Contains(fmt.Sprint(p["setupActions"]), "git hooks (post-commit, pre-push)") {
 		t.Errorf("policy = %v", p)
 	}
-	if slices.ContainsFunc(mcpTools, func(x mcpTool) bool { return x.Name == "email_verify" }) {
-		t.Error("email_verify takes a code in the conversation")
-	}
 	s, err := call("login_start", map[string]any{"email": "Dev@Example.com", "agreed": true})
 	enter, _ := s["enterCode"].(map[string]any)
 	if err != nil || s["newAccount"] != true || s["codeDigits"] != float64(6) || enter["here"] != "login_verify" ||
@@ -365,7 +362,8 @@ func TestMCPSetup(t *testing.T) {
 	}
 	s, err = call("email_start", map[string]any{"email": "work@example.com"})
 	enter, _ = s["enterCode"].(map[string]any)
-	if err != nil || s["codeSentTo"] != "work@example.com" || enter["terminal"] != "gitfolio email verify work@example.com --code <code>" {
+	if err != nil || s["codeSentTo"] != "work@example.com" || enter["here"] != "email_verify" ||
+		enter["terminal"] != "gitfolio email verify work@example.com --code <code>" {
 		t.Fatalf("email_start = %v, %v", s, err)
 	}
 	v, err = jsonStdout(t, func() error {
@@ -381,6 +379,20 @@ func TestMCPSetup(t *testing.T) {
 	}
 	if cfg, _ := loadConfig(dir); !slices.Contains(cfg.Emails, "work@example.com") {
 		t.Errorf("work email not kept: %v", cfg.Emails)
+	}
+	// The code of another work email given in the conversation: a wrong one may be given again.
+	if _, err := call("email_start", map[string]any{"email": "Other@Example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := call("email_verify", map[string]any{"email": "other@example.com", "code": "000000"}); err == nil ||
+		!strings.Contains(err.Error(), "wrong code") {
+		t.Errorf("wrong code: %v", err)
+	}
+	if v, err := call("email_verify", map[string]any{"email": "other@example.com", "code": "123456"}); err != nil || v["verified"] != true {
+		t.Errorf("email_verify = %v, %v", v, err)
+	}
+	if v, err := call("email_verify", map[string]any{"email": "other@example.com", "code": "123456"}); err != nil || v["verified"] != true {
+		t.Errorf("email_verify once verified = %v, %v", v, err)
 	}
 }
 
