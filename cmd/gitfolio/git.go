@@ -528,10 +528,21 @@ func logRange(repo string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	rng := []string{"HEAD"}
 	if strings.TrimSpace(out) != "" {
-		return []string{"--remotes"}, nil
+		rng = []string{"--remotes"}
 	}
-	return []string{"HEAD"}, nil
+	// A shallow clone's boundary commits have no parents, so git would count every file as theirs: they
+	// wait for fetch --unshallow.
+	if p, err := git(repo, "rev-parse", "--git-path", "shallow"); err == nil {
+		if p = strings.TrimSpace(p); !filepath.IsAbs(p) {
+			p = filepath.Join(repo, p)
+		}
+		if b, err := os.ReadFile(p); err == nil && len(strings.Fields(string(b))) > 0 {
+			rng = append(append(rng, "--not"), strings.Fields(string(b))...)
+		}
+	}
+	return rng, nil
 }
 
 // remoteBranches maps every commit on a remote-tracking branch to one branch name ("main",

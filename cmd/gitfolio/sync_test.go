@@ -664,7 +664,7 @@ func TestSyncSnapshots(t *testing.T) {
 }
 
 // A shallow clone made whole (fetch --unshallow) has more commits under the same branch tips: the scan
-// after it collects them.
+// after it collects them. Its boundary commit waits until then, as git would give it every file.
 func TestScanAfterUnshallow(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
@@ -683,12 +683,12 @@ func TestScanAfterUnshallow(t *testing.T) {
 	git("clone", "-q", "--depth", "1", "file://"+up, clone)
 	git("-C", clone, "config", "user.email", "me@example.com")
 	r := newRepo(clone)
-	if n, err := scanRepo(data, &r, false); err != nil || n != 1 {
-		t.Fatalf("shallow: %d %v", n, err)
+	if n, err := scanRepo(data, &r, false); err != nil || n != 0 {
+		t.Fatalf("shallow: %d %v, want the boundary commit left out", n, err)
 	}
 	git("-C", clone, "fetch", "-q", "--unshallow")
-	if n, err := scanRepo(data, &r, false); err != nil || n != 2 {
-		t.Errorf("after --unshallow: %d %v, want 2", n, err)
+	if n, err := scanRepo(data, &r, false); err != nil || n != 3 {
+		t.Errorf("after --unshallow: %d %v, want 3", n, err)
 	}
 }
 
