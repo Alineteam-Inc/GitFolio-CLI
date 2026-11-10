@@ -17,7 +17,7 @@ import (
 
 // version is set at release time via -ldflags "-X main.version=...". A build from source carries the
 // release it leads to, with "-dev" (sourceBuild).
-var version = "0.7.1-dev"
+var version = "0.7.2-dev"
 
 // sourceBuild reports whether this is a build from source: version "dev" or a release number with
 // "-dev". It keeps its own data folder (dataDir), may talk to another server (apiBase), registers its own

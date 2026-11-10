@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "gitfolio",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Your portfolio, resume and tech stack career from your own git history, written by your AI tool from GitFolio's facts and your answers.",
   "author": {
     "name": "Alineteam Inc.",
