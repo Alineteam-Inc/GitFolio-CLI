@@ -245,7 +245,7 @@ func run(args []string) error {
 	if args[0] == "mcp" { // stdout is the protocol: no update question or notices before it
 		return cmdMCP(dir, args[1:])
 	}
-	if !slices.Contains([]string{"hook", "update", "uninstall"}, args[0]) && checkUpdate(dir) {
+	if !jsonOut && !slices.Contains([]string{"hook", "update", "uninstall"}, args[0]) && checkUpdate(dir) {
 		return nil // updated: the user runs the command again with the new binary
 	}
 	if !slices.Contains([]string{"hook", "init", "login", "logout", "email", "uninstall"}, args[0]) {
@@ -306,6 +306,9 @@ func run(args []string) error {
 		case "sync":
 			return cmdSync(dir, args[1:])
 		case "list":
+			if len(args) > 1 {
+				return failure("usage", "gitfolio list")
+			}
 			return cmdList(dir)
 		case "status":
 			return cmdStatus(dir, args[1:])
@@ -431,6 +434,7 @@ func editDistance(a, b string) int {
 // login (DESIGN 6.1); commands that only show, clean up or configure keep working, so a logged-out
 // user can still point to another server, remove repositories or turn dependency detection off.
 func collects(args []string) bool {
+	args = withoutJSON(args) // deps --json scan collects as deps scan --json does
 	switch args[0] {
 	case "add", "scan", "sync", "hook":
 		return true

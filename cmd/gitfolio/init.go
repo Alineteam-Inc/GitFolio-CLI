@@ -69,6 +69,14 @@ func cmdInit(dir string, args []string) error {
 	case jsonOut:
 		return failure("usage", initUsage)
 	}
+	for _, a := range args { // folders to search: a flag or a typo is not saved as one
+		if strings.HasPrefix(a, "-") {
+			return failure("usage", initUsage)
+		}
+		if info, err := os.Stat(expandHome(a)); err != nil || !info.IsDir() {
+			return failure("rootMissing", a)
+		}
+	}
 	fmt.Fprint(out, header()+"\n"+indent(tr(lang, "policy"))+"\n")
 	if interactive() && (!askYesNo(lang, "policyAgree", true) || stdinClosed) {
 		say(lang, "policyDeclined")

@@ -201,6 +201,38 @@ func TestJSONBeforeCommand(t *testing.T) {
 	if err := run([]string{"sync", "--json"}); errorCode(err) != "loginFirst" || !jsonOut {
 		t.Errorf("sync --json logged out: %v, JSON %v", err, jsonOut)
 	}
+	// Wherever --json goes, deps scan collects and so needs the login; list takes no arguments.
+	if err := run([]string{"deps", "--json", "scan", "--all"}); errorCode(err) != "loginFirst" {
+		t.Errorf("deps --json scan logged out: %v", err)
+	}
+	if err := run([]string{"list", "--json"}); errorCode(err) != "usage" {
+		t.Errorf("list --json: %v", err)
+	}
+}
+
+// init's arguments are folders to search: a flag or a missing folder stops it before anything is shown
+// or saved. A repository whose folder is gone is found by its path however the slashes go.
+func TestArgumentsAreChecked(t *testing.T) {
+	dir := t.TempDir()
+	defer func(o io.Writer) { out = o }(out)
+	var buf bytes.Buffer
+	out = &buf
+	if err := cmdInit(dir, []string{"--help"}); errorCode(err) != "usage" {
+		t.Errorf("init --help: %v", err)
+	}
+	if err := cmdInit(dir, []string{filepath.Join(dir, "Cdoe")}); errorCode(err) != "rootMissing" {
+		t.Errorf("init with a missing folder: %v", err)
+	}
+	if cfg, _ := loadConfig(dir); buf.Len() > 0 || len(cfg.Roots) > 0 {
+		t.Errorf("init went on: %q, roots %v", buf.String(), cfg.Roots)
+	}
+	gone := filepath.Join(dir, "gone", "app")
+	if err := saveRepos(dir, []Repo{{ID: "a", Name: "app", Path: filepath.ToSlash(gone)}}); err != nil { // as git writes it
+		t.Fatal(err)
+	}
+	if err := cmdRemove(dir, []string{gone}); err != nil {
+		t.Errorf("remove by the path of a missing folder: %v", err)
+	}
 }
 
 // The email list waits on aline.team for fresh ✔ marks, so like whoami it runs outside the lock
