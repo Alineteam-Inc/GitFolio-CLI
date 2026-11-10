@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -226,5 +228,62 @@ func TestWorkCommand(t *testing.T) {
 	}
 	if err := cmdWork(dir, []string{"--from", "June"}); errorCode(err) != "usage" {
 		t.Errorf("a period it cannot read: %v", err)
+	}
+}
+
+// The tech tool: the techs of the repository the AI tool runs in, with the user's experience in each over
+// the repositories AI tools may see; and for one tech, where it comes from, with the subjects of the
+// largest commits touching it only where messages are shown.
+func TestTechTool(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	dir, repo := t.TempDir(), t.TempDir()
+	if out, err := exec.Command("git", "init", "-q", repo).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v %s", err, out)
+	}
+	top, err := topLevel(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(saveRepos(dir, []Repo{
+		{ID: "a", Name: "app", Path: top, Provider: "GITHUB", Namespace: "me/app", AI: aiExposure{Messages: "subjects"}},
+		{ID: "b", Name: "secret", Path: "/x/secret", AI: aiExposure{Hidden: true}},
+		{ID: "c", Name: "lib", Path: "/x/lib", AI: aiExposure{Name: anonymousName}},
+	}))
+	c := func(repo, hash, date, msg string, files ...FileStat) Commit {
+		return Commit{Repo: repo, Hash: hash, Date: date, Message: msg, CreationType: creationHuman, Files: files}
+	}
+	must(writeCommits(dir, []Commit{
+		c("a", "1", "2025-06-10T12:00:00Z", "feat: billing", FileStat{Name: "pay.go", Add: 300}),
+		c("a", "2", "2025-08-01T12:00:00Z", "fix: rounding", FileStat{Name: "pay.go", Add: 2}),
+		c("a", "3", "2025-09-01T12:00:00Z", "docs: readme", FileStat{Name: "README.md", Add: 50}),
+		c("b", "4", "2024-01-01T12:00:00Z", "feat: secret go", FileStat{Name: "x.go", Add: 1000}),
+		c("c", "5", "2025-01-01T12:00:00Z", "feat: lib go", FileStat{Name: "lib.go", Add: 10}),
+	}))
+	t.Chdir(repo)
+	v, err := mcpTech(dir, nil)
+	b, _ := json.Marshal(v)
+	if s := string(b); err != nil || !strings.Contains(s, `"repository":"app"`) || !strings.Contains(s, `"name":"Go","kind":"language","repositoryCount":2`) {
+		t.Errorf("tech here = %s, %v", s, err)
+	}
+	v, err = mcpTech(dir, map[string]any{"tech": "go"})
+	b, _ = json.Marshal(v)
+	if s := string(b); err != nil || !strings.Contains(s, `"repository":"app"`) || !strings.Contains(s, `"representativeCommits":["feat: billing","fix: rounding"]`) ||
+		!strings.Contains(s, `"from":"2025-06","to":"2025-08","activeMonths":2,"commits":2`) || strings.Contains(s, "secret") ||
+		strings.Contains(s, "lib go") || !strings.Contains(s, "Repository 1") {
+		t.Errorf("tech go = %s, %v", s, err)
+	}
+	if _, err := mcpTech(dir, map[string]any{"tech": "cobol"}); err == nil {
+		t.Error("a tech the user never used")
+	}
+	t.Chdir(t.TempDir())
+	if _, err := mcpTech(dir, nil); err == nil {
+		t.Error("tech outside a registered repository")
 	}
 }

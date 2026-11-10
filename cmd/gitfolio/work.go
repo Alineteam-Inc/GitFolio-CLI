@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -247,6 +248,153 @@ func mcpWork(dir string, args map[string]any) (any, error) {
 		return nil, err
 	}
 	return workOf(repos, byRepo, p, true), nil
+}
+
+// techExperience is the user's experience with one tech in the repositories AI tools may see, as the
+// stack tool counts it, and, with repositories, where it comes from.
+type techExperience struct {
+	Name         string     `json:"name"`
+	Kind         string     `json:"kind"` // language, framework or library
+	Repositories int        `json:"repositoryCount"`
+	Months       int        `json:"careerMonths"`
+	ActiveMonths int        `json:"activeMonths"`
+	From         string     `json:"from,omitempty"` // first and last month
+	To           string     `json:"to,omitempty"`
+	Where        []techRepo `json:"repositories,omitempty"`
+}
+
+// techRepo is one repository a tech comes from: the span and months of the user's commits that touch it
+// (all the repository's, for a tech only its dependencies show), and the subjects of the largest of them
+// where the user lets AI tools see messages.
+type techRepo struct {
+	Repository   string   `json:"repository"`
+	Service      string   `json:"service,omitempty"`
+	From         string   `json:"from"`
+	To           string   `json:"to"`
+	ActiveMonths int      `json:"activeMonths"`
+	Commits      int      `json:"commits"`
+	Examples     []string `json:"representativeCommits,omitempty"`
+}
+
+// mcpTech is the user's experience with each tech of the repository they work in now (the folder the AI
+// tool runs in), or, with tech, with that one tech and where it comes from.
+func mcpTech(dir string, args map[string]any) (any, error) {
+	lang := detectLang(os.Getenv)
+	var all []Repo
+	var commits []Commit
+	var deps []Dependency
+	if err := withLock(dir, func() error { // a push may be writing them
+		var err error
+		if all, err = loadRepos(dir); err != nil {
+			return err
+		}
+		if commits, err = readCommits(dir); err != nil {
+			return err
+		}
+		deps, err = loadDeps(dir)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	repos := aiView(lang, all)
+	data := repoTechsOf(repos, commits, deps)
+	u := localStack(repos, commits, deps)
+	byName := map[string]techExperience{}
+	for kind, list := range map[string][]techUsage{"language": u.Languages, "framework": u.Frameworks, "library": u.Libraries} {
+		for _, t := range list {
+			e := techExperience{Name: t.Name, Kind: kind, Repositories: *t.ProjectCount, ActiveMonths: len(t.ActivityMonths)}
+			if t.CareerMonths != nil {
+				e.Months, e.From, e.To = *t.CareerMonths, yearMonth(t.StartDate), yearMonth(t.EndDate)
+			}
+			byName[strings.ToLower(t.Name)] = e
+		}
+	}
+	key := func(k string) string { return strings.ToLower(techCatalog[cmp.Or(mergedTechs[k], k)].name) }
+	want, _ := args["tech"].(string)
+	if want = strings.ToLower(strings.TrimSpace(want)); want == "" {
+		top, err := topLevel(".")
+		if main, ok := mainWorktree("."); err == nil && ok {
+			top = main
+		}
+		here := slices.IndexFunc(all, func(r Repo) bool { return err == nil && filepath.Clean(r.Path) == filepath.Clean(top) })
+		i := slices.IndexFunc(repos, func(r Repo) bool { return here >= 0 && r.ID == all[here].ID }) // the view has no paths
+		if i < 0 {
+			return nil, errors.New("this folder is not a repository GitFolio collects and AI tools may see: name a tech " +
+				"(from stack), or let the user register it with add_repository")
+		}
+		list := []techExperience{}
+		for k := range data[repos[i].ID].techs {
+			if e, ok := byName[key(k)]; ok && !slices.ContainsFunc(list, func(x techExperience) bool { return x.Name == e.Name }) {
+				list = append(list, e)
+			}
+		}
+		slices.SortFunc(list, func(a, b techExperience) int {
+			return cmp.Or(cmp.Compare(b.Months, a.Months), cmp.Compare(a.Name, b.Name))
+		})
+		return map[string]any{"repository": repos[i].Name, "techs": list}, nil
+	}
+	e, ok := byName[want]
+	if !ok {
+		return nil, fmt.Errorf("no tech named %q in the repositories AI tools may see: stack lists them", want)
+	}
+	byRepo := map[string][]Commit{}
+	for _, c := range commits {
+		byRepo[c.Repo] = append(byRepo[c.Repo], c)
+	}
+	for _, r := range repos {
+		d := data[r.ID]
+		if !slices.ContainsFunc(slices.Collect(maps.Keys(d.techs)), func(k string) bool { return key(k) == want }) {
+			continue
+		}
+		touches := func(c Commit) (lines int) {
+			for _, f := range c.Files {
+				if slices.ContainsFunc(fileTechs(f.Name), func(k string) bool { return key(k) == want }) {
+					lines += f.Add + f.Del
+				}
+			}
+			return lines
+		}
+		var counted []Commit
+		for _, c := range byRepo[r.ID] {
+			if _, ok := countsForStack(c); ok && touches(c) > 0 {
+				counted = append(counted, c)
+			}
+		}
+		if len(counted) == 0 { // only its dependencies show it: the repository's work
+			counted = slices.DeleteFunc(slices.Clone(byRepo[r.ID]), func(c Commit) bool { _, ok := countsForStack(c); return !ok })
+			touches = func(c Commit) (lines int) {
+				for _, f := range c.Files {
+					lines += f.Add + f.Del
+				}
+				return lines
+			}
+		}
+		if len(counted) == 0 {
+			continue
+		}
+		where := techRepo{Repository: r.Name, Service: providerNames[r.Provider], Commits: len(counted)}
+		months := map[string]bool{}
+		for _, c := range counted {
+			t, _ := countsForStack(c)
+			m := t.Format("2006-01")
+			months[m] = true
+			if where.From == "" || m < where.From {
+				where.From = m
+			}
+			where.To = max(where.To, m)
+		}
+		where.ActiveMonths = len(months)
+		if r.AI.Messages != "" {
+			slices.SortStableFunc(counted, func(a, b Commit) int { return cmp.Compare(touches(b), touches(a)) })
+			for _, c := range counted[:min(3, len(counted))] {
+				subject, _ := messageParts(c.Message)
+				where.Examples = append(where.Examples, subject)
+			}
+		}
+		e.Where = append(e.Where, where)
+	}
+	slices.SortStableFunc(e.Where, func(a, b techRepo) int { return strings.Compare(b.To, a.To) })
+	return e, nil
 }
 
 // workReport is the work of each repository with commits in the period, the latest first, and the total.

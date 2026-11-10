@@ -10,7 +10,8 @@ those two. Through the [GitFolio CLI](https://github.com/Alineteam-Inc/GitFolio-
 
 - To read, as you allow (below): `status` (repositories here, login, sync), `work` (per repository and
   period: commit types, kinds of work, languages, lines, share made with AI), `timeline` (month by month),
-  `commits` (only where you show messages), `stack` (tech stack periods), `devtype` (your type, scores
+  `commits` (only where you show messages), `stack` (tech stack periods), `tech` (your experience with the
+  techs of the repository you work in, or with one tech and where it comes from), `devtype` (your type, scores
   and aline.team's reasoning), `portfolio` (a Markdown draft), `ai_settings`.
 - To set GitFolio up for you: `policy`, `login_start` and `login_verify` (your email and its code, which
   you can also enter in the GitFolio app or a terminal), `email_start` and `email_verify` (a work email and

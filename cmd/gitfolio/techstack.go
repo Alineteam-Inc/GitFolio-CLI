@@ -230,59 +230,7 @@ func knownFile(file string) bool {
 // last day, careerMonths the spans merged where they overlap or touch, activityMonths the months. Each
 // list goes by projectCount, then name.
 func localStack(repos []Repo, commits []Commit, deps []Dependency) techUsages {
-	type repoData struct {
-		techs      map[string]bool
-		start, end time.Time
-		months     map[string]bool
-	}
-	languageKeys := map[string]string{} // display name → catalog key
-	for k, t := range techCatalog {
-		if t.category == "LANGUAGE" {
-			languageKeys[t.name] = k
-		}
-	}
-	data := map[string]*repoData{}
-	for _, r := range repos {
-		data[r.ID] = &repoData{techs: map[string]bool{}, months: map[string]bool{}}
-	}
-	for _, c := range commits {
-		d := data[c.Repo]
-		if d == nil {
-			continue
-		}
-		typ := commitType(c.Message)
-		if t, err := time.Parse(time.RFC3339, c.Date); err == nil && typ != "SYSTEM" && typ != "UNCATEGORIZED" &&
-			slices.ContainsFunc(c.Files, func(f FileStat) bool { return knownFile(f.Name) }) {
-			t = t.UTC().Truncate(24 * time.Hour)
-			if d.start.IsZero() || t.Before(d.start) {
-				d.start = t
-			}
-			if t.After(d.end) {
-				d.end = t
-			}
-			d.months[t.Format("2006-01")] = true
-		}
-		for _, f := range c.Files {
-			if k := languageKeys[languageOf(f.Name)]; k != "" {
-				d.techs[k] = true
-			}
-			for _, k := range filePresenceTechs(f.Name) {
-				d.techs[k] = true
-			}
-		}
-	}
-	names := map[[2]string][]string{} // repository and ecosystem → dependency names
-	for _, dep := range deps {
-		names[[2]string{dep.Repo, dep.Ecosystem}] = append(names[[2]string{dep.Repo, dep.Ecosystem}], dep.Name)
-	}
-	for key, n := range names {
-		if d := data[key[0]]; d != nil {
-			for k := range depTechs(key[1], n) {
-				d.techs[k] = true
-			}
-		}
-	}
-
+	data := repoTechsOf(repos, commits, deps)
 	type acc struct {
 		projects   int
 		ranges     [][2]time.Time
@@ -340,6 +288,85 @@ func localStack(repos []Repo, commits []Commit, deps []Dependency) techUsages {
 		})
 	}
 	return u
+}
+
+// repoTechs is what one repository shows for the tech stack (localStack): its techs (catalog keys) and the
+// span and months of the user's commits in it that count.
+type repoTechs struct {
+	techs      map[string]bool
+	start, end time.Time
+	months     map[string]bool
+}
+
+// repoTechsOf works out repoTechs for each repository, by its ID.
+func repoTechsOf(repos []Repo, commits []Commit, deps []Dependency) map[string]*repoTechs {
+	data := map[string]*repoTechs{}
+	for _, r := range repos {
+		data[r.ID] = &repoTechs{techs: map[string]bool{}, months: map[string]bool{}}
+	}
+	for _, c := range commits {
+		d := data[c.Repo]
+		if d == nil {
+			continue
+		}
+		if t, ok := countsForStack(c); ok {
+			if d.start.IsZero() || t.Before(d.start) {
+				d.start = t
+			}
+			if t.After(d.end) {
+				d.end = t
+			}
+			d.months[t.Format("2006-01")] = true
+		}
+		for _, f := range c.Files {
+			for _, k := range fileTechs(f.Name) {
+				d.techs[k] = true
+			}
+		}
+	}
+	names := map[[2]string][]string{} // repository and ecosystem → dependency names
+	for _, dep := range deps {
+		names[[2]string{dep.Repo, dep.Ecosystem}] = append(names[[2]string{dep.Repo, dep.Ecosystem}], dep.Name)
+	}
+	for key, n := range names {
+		if d := data[key[0]]; d != nil {
+			for k := range depTechs(key[1], n) {
+				d.techs[k] = true
+			}
+		}
+	}
+	return data
+}
+
+// countsForStack is the UTC day of a commit that counts for the tech stack's spans: not a merge or other
+// system commit, not one whose kind cannot be told, and with a file of a kind aline.team knows.
+func countsForStack(c Commit) (time.Time, bool) {
+	typ := commitType(c.Message)
+	t, err := time.Parse(time.RFC3339, c.Date)
+	if err != nil || typ == "SYSTEM" || typ == "UNCATEGORIZED" || !slices.ContainsFunc(c.Files, func(f FileStat) bool { return knownFile(f.Name) }) {
+		return time.Time{}, false
+	}
+	return t.UTC().Truncate(24 * time.Hour), true
+}
+
+// languageKeys maps a language's display name to its catalog key.
+var languageKeys = func() map[string]string {
+	keys := map[string]string{}
+	for k, t := range techCatalog {
+		if t.category == "LANGUAGE" {
+			keys[t.name] = k
+		}
+	}
+	return keys
+}()
+
+// fileTechs is the techs (catalog keys) a file shows: its language and the techs its presence shows.
+func fileTechs(file string) []string {
+	techs := filePresenceTechs(file)
+	if k := languageKeys[languageOf(file)]; k != "" {
+		techs = append(techs, k)
+	}
+	return techs
 }
 
 // localDateTime is how aline.team writes a date and time without a zone.

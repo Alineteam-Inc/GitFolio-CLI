@@ -69,6 +69,17 @@ var mcpTools = []mcpTool{
 		run: mcpStack,
 	},
 	{
+		Name:  "tech",
+		Title: "Experience with a tech",
+		Description: "The user's experience with each tech of the repository they work in now (the folder you run in), " +
+			"as the stack tool counts it over the repositories AI tools may see: repositories, months from first to last " +
+			"commit, active months. With tech, that one tech and where it comes from: per repository, the span, active " +
+			"months and commits that touch it, and the subjects of the largest of them where the user lets AI tools see " +
+			"messages. Use it to ground what the user says they know.",
+		InputSchema: object(map[string]any{"tech": prop("string", "A tech by its name in stack, e.g. Go or React. Leave out for the current repository's.")}),
+		run:         mcpTech,
+	},
+	{
 		Name:  "work",
 		Title: "Work by repository",
 		Description: "What the user's work in each repository was made of, counted on this computer, for a period if given: " +
