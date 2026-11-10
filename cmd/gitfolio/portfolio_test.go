@@ -168,12 +168,14 @@ func TestPortfolio(t *testing.T) {
 	}
 
 	if runtime.GOOS == "linux" { // other systems also look in their usual folders, where one may be
+		path := os.Getenv("PATH")
 		t.Setenv("CHROME_PATH", "")
 		t.Setenv("PATH", "")
 		if err := cmdPortfolio(dir, []string{"cv.pdf", "--json"}); errorCode(err) != "portfolioNoBrowser" {
 			t.Errorf("a PDF without a browser: %v", err)
 		}
 		jsonOut = false
+		t.Setenv("PATH", path) // the stand-in browser below runs cat
 	}
 	t.Setenv("CHROME_PATH", filepath.Join(work, "no-such-browser"))
 	if err := cmdPortfolio(dir, []string{"cv.pdf"}); err == nil {
