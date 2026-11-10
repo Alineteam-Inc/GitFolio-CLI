@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -364,5 +365,49 @@ func TestWriteFileTogether(t *testing.T) {
 	}
 	if left, _ := filepath.Glob(p + ".*"); len(left) > 0 {
 		t.Errorf("left %v", left)
+	}
+}
+
+// A push from a linked worktree (git worktree add) runs the registered repository's hooks: its commits
+// are collected under that repository.
+func TestPushFromWorktree(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	base, dir := t.TempDir(), t.TempDir()
+	up, main, feat := filepath.Join(base, "up.git"), filepath.Join(base, "app"), filepath.Join(base, "feat")
+	git := func(args ...string) {
+		t.Helper()
+		if out, err := exec.Command("git", append([]string{"-c", "user.name=me", "-c", "user.email=me@example.com"}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q", "--bare", up)
+	git("clone", "-q", up, main)
+	git("-C", main, "config", "user.email", "me@example.com")
+	git("-C", main, "commit", "-q", "--allow-empty", "-m", "feat: start")
+	git("-C", main, "push", "-q", "origin", "HEAD:main")
+	git("-C", main, "worktree", "add", "-q", "-b", "feat", feat)
+	git("-C", feat, "commit", "-q", "--allow-empty", "-m", "feat: from the worktree")
+	git("-C", feat, "push", "-q", "origin", "feat")
+	top, err := topLevel(main)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := mainWorktree(main); ok {
+		t.Error("the main worktree took for a linked one")
+	}
+	if err := saveConfig(dir, Config{Emails: []string{"me@example.com"}, AutoSyncOff: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveRepos(dir, []Repo{newRepo(top)}); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(feat)
+	if err := cmdHook(dir, []string{"push-wait"}); err != nil {
+		t.Fatal(err)
+	}
+	commits, err := readCommits(dir)
+	if err != nil || !slices.ContainsFunc(commits, func(c Commit) bool { return c.Message == "feat: from the worktree" }) {
+		t.Errorf("collected %d commits (%v), want the worktree's", len(commits), err)
 	}
 }

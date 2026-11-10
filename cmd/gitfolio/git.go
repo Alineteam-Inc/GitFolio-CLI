@@ -398,6 +398,17 @@ func topLevel(dir string) (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
+// mainWorktree is the main working tree of dir when dir is a linked one (git worktree add), whose pushes
+// run the main one's hooks: only there does git name the shared .git folder by an absolute path.
+func mainWorktree(dir string) (string, bool) {
+	out, err := git(dir, "rev-parse", "--git-common-dir")
+	common := strings.TrimSpace(out)
+	if err != nil || !filepath.IsAbs(common) {
+		return "", false
+	}
+	return filepath.Dir(common), true
+}
+
 // providers maps git service hosts to the provider sent to aline.team; any other host is OTHER
 // (self-hosted servers included), so internal host names never leave the machine.
 var providers = map[string]string{
