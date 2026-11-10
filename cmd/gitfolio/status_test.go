@@ -2,10 +2,13 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -131,6 +134,17 @@ func TestStatusSyncJSON(t *testing.T) {
 	}
 	if r := list[0].(map[string]any); r["namespace"] != "me/app" || r["commits"] != 1.0 || r["sent"] != 1.0 || r["hooks"] != "off" {
 		t.Errorf("repository: %v", r)
+	}
+	if v["version"] != version || v["newerRelease"] != nil || !strings.Contains(fmt.Sprint(v["gitVersion"]), ".") {
+		t.Errorf("versions: %v %v %v", v["version"], v["newerRelease"], v["gitVersion"])
+	}
+	if err := saveJSON(filepath.Join(dir, updateFile), updateState{Latest: "v99.0.0"}); err != nil {
+		t.Fatal(err)
+	}
+	defer func(v string) { version = v }(version)
+	version = "0.7.1" // a release build: a build from source looks nothing up
+	if v := status(); v["newerRelease"] != "99.0.0" {
+		t.Errorf("a newer release seen: %v", v["newerRelease"])
 	}
 	// What waits, and how to have it taken: a repository removed since the last sync no longer waits.
 	st, _ := loadSync(dir)

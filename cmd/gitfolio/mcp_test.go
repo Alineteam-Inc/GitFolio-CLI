@@ -107,7 +107,8 @@ func TestMCP(t *testing.T) {
 		t.Errorf("tools/list = %+v", tools)
 	}
 	if s := text("3"); !strings.Contains(s, `"name":"app"`) || !strings.Contains(s, `"repository":"me/app"`) ||
-		!strings.Contains(s, `"commits":1`) || strings.Contains(s, "/home/me") || got["3"].Result.IsError {
+		!strings.Contains(s, `"commits":1`) || !strings.Contains(s, `"hooks":"manual"`) || !strings.Contains(s, `"gitVersion":"`) ||
+		strings.Contains(s, "/home/me") || got["3"].Result.IsError {
 		t.Errorf("status = %s", s)
 	}
 	if s := text("4"); !strings.Contains(s, `"devTypeTitle":"KEEPER"`) || !strings.Contains(s, `"agilityStat":50`) ||

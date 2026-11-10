@@ -45,8 +45,9 @@ var mcpTools = []mcpTool{
 		Title: "Collected repositories",
 		Description: "The repositories GitFolio collects on this computer and what it holds for each: the user's commits, " +
 			"how many of them aline.team has, lines changed, files created, the share made with AI, languages by changed " +
-			"lines, first and last commit. Also whether GitFolio is logged in (if not, start it with policy and login_start), " +
-			"the sync mode and the last sync. Reads this computer only.",
+			"lines, first and last commit, whether its git hooks are on (pushes are collected only then). Also whether " +
+			"GitFolio is logged in (if not, start it with policy and login_start), the sync mode, the last sync, this " +
+			"GitFolio's version and a newer release if one is known, and the git version. Reads this computer only.",
 		run: mcpStatus,
 	},
 	{
@@ -394,6 +395,7 @@ func mcpStatus(dir string, _ map[string]any) (any, error) {
 		FirstCommit  string         `json:"firstCommit,omitempty"`
 		LastCommit   string         `json:"lastCommit,omitempty"`
 		Waiting      bool           `json:"waitingForVerifiedEmail,omitempty"` // which email: gitfolio email
+		Hooks        string         `json:"hooks"`                             // on, off, or manual: pushes are not collected unless on
 	}
 	day := func(t time.Time) string {
 		if t.IsZero() {
@@ -405,15 +407,17 @@ func mcpStatus(dir string, _ map[string]any) (any, error) {
 	for _, v := range aiView(detectLang(os.Getenv), repos) {
 		seen[v.ID] = v
 	}
+	hooks := make([]string, len(repos))
+	sideBySide(len(repos), func(i int) { hooks[i] = hookStatus(repos[i].Path) })
 	var list []repo
-	for _, r := range repos {
+	for i, r := range repos {
 		v, ok := seen[r.ID]
 		if !ok {
 			continue
 		}
 		s := statusOf(r, commits, nil, st)
 		list = append(list, repo{v.Name, providerNames[r.Provider], v.Namespace, s.commits, s.sentCount(r, st), s.changes,
-			s.add, s.del, s.created, s.aiShare(), s.lines, day(s.first), day(s.last), st.Waiting[r.Provider+"/"+r.Namespace] != ""})
+			s.add, s.del, s.created, s.aiShare(), s.lines, day(s.first), day(s.last), st.Waiting[r.Provider+"/"+r.Namespace] != "", hooks[i]})
 	}
 	mode := "automatic"
 	if cfg.AutoSyncOff {
@@ -425,8 +429,10 @@ func mcpStatus(dir string, _ map[string]any) (any, error) {
 	}
 	// The error masked as commit messages are: a failed request names its URL, the address of a repository
 	// that may be hidden from AI tools.
-	return map[string]any{"loggedIn": c.loggedIn(), "repositories": list, "syncMode": mode, "lastSync": st.LastSync,
-		"lastSyncError": newMasker(cfg.Mask).apply(st.LastError)}, nil
+	res := map[string]any{"loggedIn": c.loggedIn(), "repositories": list, "syncMode": mode, "lastSync": st.LastSync,
+		"lastSyncError": newMasker(cfg.Mask).apply(st.LastError)}
+	maps.Copy(res, versions(dir))
+	return res, nil
 }
 
 func mcpDevType(dir string, args map[string]any) (any, error) {

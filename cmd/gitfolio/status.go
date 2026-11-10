@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -304,8 +305,25 @@ func statusJSON(dir string, repos []Repo, commits []Commit, st syncState, cfg Co
 	if cfg.AutoSyncOff {
 		mode = "local" // commits are never sent: unsent only counts in automatic mode
 	}
-	return printJSON(map[string]any{"account": account, "setUp": c.loggedIn() && len(repos) > 0, "syncMode": mode,
-		"lastSync": st.LastSync, "lastSyncError": st.LastError, "unsent": unsent, "repositories": list, "waiting": c.waitingJSON(waiting)})
+	res := map[string]any{"account": account, "setUp": c.loggedIn() && len(repos) > 0, "syncMode": mode,
+		"lastSync": st.LastSync, "lastSyncError": st.LastError, "unsent": unsent, "repositories": list, "waiting": c.waitingJSON(waiting)}
+	maps.Copy(res, versions(dir))
+	return printJSON(res)
+}
+
+// versions is what a status check adds about the software: this GitFolio, a newer release if one was seen
+// (update.json, looked up at most once a day by a release build; null otherwise) and the git it runs.
+func versions(dir string) map[string]any {
+	var release any // null: none known
+	var st updateState
+	if loadJSON(filepath.Join(dir, updateFile), &st) == nil && newer(st.Latest, version) {
+		release = strings.TrimPrefix(st.Latest, "v")
+	}
+	gitVersion := ""
+	if out, err := exec.Command(gitPath, "--version").Output(); err == nil { // "git version 2.47.0"
+		gitVersion = strings.TrimPrefix(strings.TrimSpace(string(out)), "git version ")
+	}
+	return map[string]any{"version": version, "newerRelease": release, "gitVersion": gitVersion}
 }
 
 // repoJSON is status <name> --json: what the text shows of one repository. dependencies is null while
