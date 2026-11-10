@@ -20,7 +20,8 @@ those two. Through the [GitFolio CLI](https://github.com/Alineteam-Inc/GitFolio-
 
 **Skills:** `setup` (start GitFolio and decide what to share), `portfolio` (a short interview, then your
 portfolio, resume or career description, fitted to a job posting if you give one), `tech-career`,
-`devtype` (your scores explained), `sync-doctor` (why something is missing on aline.team).
+`devtype` (your scores explained), `retro` (a stand-up update or a weekly or monthly retrospective from
+your commits), `sync-doctor` (why something is missing on aline.team).
 
 ## Needs
 
