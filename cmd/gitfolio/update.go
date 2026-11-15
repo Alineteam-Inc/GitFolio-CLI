@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -117,12 +118,22 @@ func noticeUpdate(dir string) {
 }
 
 // installUpdate installs release tag latest the way the copy at exe ("" for this one) was installed. What
-// the installer prints goes where messages for people go (stderr with --json).
+// the installer prints goes where messages for people go (stderr with --json). With --json its last
+// lines on stderr (brew's "Error: …") also end the error: a program shows the message, not stderr.
 func installUpdate(latest, exe string) error {
 	cmd, manual := updateCommand(latest, exe)
+	var said bytes.Buffer
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, out, os.Stderr
+	if jsonOut {
+		cmd.Stderr = io.MultiWriter(os.Stderr, &said)
+	}
 	if err := cmd.Run(); err != nil {
-		return failure("updateFailed", err, manual)
+		f := failure("updateFailed", err, manual).(*failErr)
+		// ponytail: the last 5 lines; keep more if an installer's error runs longer.
+		if lines := strings.Split(strings.TrimSpace(said.String()), "\n"); lines[0] != "" {
+			f.msg += "\n\n" + strings.Join(lines[max(0, len(lines)-5):], "\n")
+		}
+		return f
 	}
 	return nil
 }
