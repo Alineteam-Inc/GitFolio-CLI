@@ -213,6 +213,36 @@ func TestBrewUpdatesItsTap(t *testing.T) {
 	}
 }
 
+// With --json a failed update ends its error with what brew said last, which a program shows; at a
+// terminal brew already said it there.
+func TestUpdateFailedSaysWhy(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no Homebrew on Windows")
+	}
+	t.Setenv("GITFOLIO_LANG", "en")
+	dir := t.TempDir()
+	cask := filepath.Join(dir, "brew", "Caskroom", "gitfolio", "0.6.0", "gitfolio")
+	brew := filepath.Join(dir, "brew", "bin", "brew")
+	for p, s := range map[string]string{cask: "", brew: "#!/bin/sh\n[ \"$1\" = --repository ] && echo " + filepath.Join(dir, "none") + " && exit\necho 'Error: Fetching the tap failed!' >&2\nexit 1\n"} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(s), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer func(o io.Writer) { out, jsonOut = o, false }(out)
+	out = io.Discard
+	for _, j := range []bool{true, false} {
+		jsonOut = j
+		err := installUpdate("v0.6.1", cask)
+		if err == nil || !strings.HasPrefix(err.Error(), "Could not update (exit status 1).") ||
+			strings.HasSuffix(err.Error(), "\nError: Fetching the tap failed!") != j {
+			t.Errorf("--json %v: %v", j, err)
+		}
+	}
+}
+
 // A copy an app ships never looks up, tells about or installs a newer release: the app updates it.
 // version --json says which kind it is.
 func TestBundledCopy(t *testing.T) {
