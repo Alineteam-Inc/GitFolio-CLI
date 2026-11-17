@@ -282,7 +282,7 @@ func emailsFromGithub(dir, lang string, c *client, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	all, err := addGithubEmails(dir, c, emails)
+	all, err := addGithubEmails(dir, c, login, emails)
 	if err != nil {
 		return err
 	}
@@ -296,12 +296,12 @@ func emailsFromGithub(dir, lang string, c *client, cfg Config) error {
 	return nil
 }
 
-// addGithubEmails adds the emails a GitHub connection verified, and the noreply address aline.team kept
-// with them, to the work emails; it returns them all.
-func addGithubEmails(dir string, c *client, emails []string) ([]string, error) {
+// addGithubEmails adds the emails a connection to the GitHub account login verified, and that account's
+// noreply address aline.team kept with them, to the work emails; it returns them all.
+func addGithubEmails(dir string, c *client, login string, emails []string) ([]string, error) {
 	all := slices.Clone(emails)
 	for _, e := range c.creds.Verified {
-		if noreply(e) && !slices.Contains(all, e) {
+		if strings.HasSuffix(e, "+"+strings.ToLower(login)+"@users.noreply.github.com") && !slices.Contains(all, e) {
 			all = append(all, e)
 		}
 	}

@@ -913,7 +913,7 @@ func mcpGithubCheck(dir string, _ map[string]any) (any, error) {
 			if err != nil {
 				return nil, err
 			}
-			all, err := addGithubEmails(dir, c, emails)
+			all, err := addGithubEmails(dir, c, gh, emails)
 			return map[string]any{"connected": true, "github": gh, "verifiedWorkEmails": all}, err
 		}
 		res, gh, err := c.githubLoggedIn(status, login, err)

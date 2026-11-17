@@ -217,7 +217,7 @@ func (f *fakeAline) handler() http.Handler {
 		case f.ghLooks == 1:
 			ok(w, map[string]any{"status": "PENDING", "interval": 5})
 		default: // the verified emails of the GitHub account, and its noreply address, are work emails now
-			f.work = append(f.work, "dev@work.example", "583231+octocat@users.noreply.github.com")
+			f.work = append(f.work, "dev@work.example", "583231+octocat@users.noreply.github.com", "9+other@users.noreply.github.com")
 			ok(w, map[string]any{"status": "CONNECTED", "interval": 5, "login": "octocat", "emails": []string{"Dev@Work.example"}})
 		}
 	})
