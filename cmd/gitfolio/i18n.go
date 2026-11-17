@@ -514,6 +514,11 @@ var messages = map[string]map[string]string{
 		"ko": "이 중 본인 이메일은 무엇인가요? 그 이메일로 쓴 커밋을 본인 커밋으로 모으고, 이메일마다 코드로 인증합니다.\n[all / 1,3 / Enter = 전부] > ",
 		"ja": "このうちあなたのメールアドレスはどれですか? そのアドレスのコミットをあなたのコミットとして集め、アドレスごとにコードで認証します。\n[all / 1,3 / Enter = すべて] > ",
 	},
+	"emailGithubAsk": {
+		"en": "Verify them at once with your GitHub account? Its verified emails count. (no: a code to each email)",
+		"ko": "GitHub 계정으로 한 번에 인증할까요? GitHub에서 인증된 이메일이 인정됩니다. (아니요: 이메일마다 코드)",
+		"ja": "GitHub アカウントでまとめて認証しますか?GitHub で認証済みのアドレスが認められます。(いいえ: アドレスごとにコード)",
+	},
 	"emailVerifyNotice": {
 		"en": "aline.team takes commits only under emails verified for your account. A code goes to each email\nbelow, one at a time (Enter skips one; verify it later with `gitfolio email verify`).\n",
 		"ko": "aline.team은 계정에 인증된 이메일의 커밋만 받습니다. 아래 이메일마다 차례로 코드를 보냅니다.\n(Enter = 건너뛰기, 나중에 `gitfolio email verify`로 인증)\n",

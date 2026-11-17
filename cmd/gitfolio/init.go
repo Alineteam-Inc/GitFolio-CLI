@@ -131,8 +131,19 @@ func cmdInit(dir string, args []string) error {
 		return err
 	}
 	// aline.team takes commits only under verified emails and merges the repositories linked on the web
-	// under them (DESIGN 6.1.2): each picked email is verified now, one after the other.
-	if interactive() && slices.ContainsFunc(cfg.Emails, func(e string) bool { return !verified(c.creds, e) && !noreply(e) }) {
+	// under them (DESIGN 6.1.2): the picked emails are verified now, at once with GitHub if the user
+	// likes (its verified emails and its noreply address), the others with a code each.
+	waits := func(by ...string) bool {
+		return slices.ContainsFunc(cfg.Emails, func(e string) bool { return slices.Contains(by, verifyBy(c.creds, e)) })
+	}
+	if interactive() && waits("code", "github") && askYesNo(lang, "emailGithubAsk", true) && !stdinClosed {
+		if err := emailsFromGithub(dir, lang, c, cfg); err != nil {
+			warn(lang, "failed", err) // a code to each email instead
+		} else if now, err := loadConfig(dir); err == nil {
+			cfg = now
+		}
+	}
+	if interactive() && waits("code") {
 		notice(tr(lang, "emailVerifyNotice"))
 		verifyEmails(lang, c, cfg.Emails)
 	}
