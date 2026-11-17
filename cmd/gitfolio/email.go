@@ -172,10 +172,12 @@ func cmdEmail(dir string, args []string) error {
 		show(out, emailList(lang, cfg, c.creds))
 		return nil
 	}
+	if slices.Equal(args, []string{"github"}) {
+		return emailsFromGithub(dir, lang, c, cfg)
+	}
 	if len(args) < 2 || !slices.Contains([]string{"add", "verify", "rm", "primary"}, args[0]) ||
 		(args[0] == "verify" && len(args) != 2 && (len(args) != 4 || args[2] != "--code")) {
-		return wrongWord("email", args[0], []string{"add", "verify", "rm", "primary"},
-			"gitfolio email [add <email>... | verify <email> [--code <code>] | rm <email> | primary <email>] [--json]")
+		return wrongWord("email", args[0], []string{"add", "verify", "rm", "primary", "github"}, emailUsage)
 	}
 	e := strings.ToLower(strings.TrimSpace(args[1]))
 	var done string
@@ -268,13 +270,52 @@ func finishEmailCode(dir string, c *client, e, code string) error {
 	return finishKept(dir, "email", e, code, func(s codeStart) error { return c.finishEmailCheck(s, code) })
 }
 
+const emailUsage = "gitfolio email [add <email>... | verify <email> [--code <code>] | rm <email> | primary <email> | github] [--json]"
+
+// emailsFromGithub links the user's GitHub account (githubConnect): its verified emails, and its noreply
+// address, become verified work emails, here too.
+func emailsFromGithub(dir, lang string, c *client, cfg Config) error {
+	if !c.ensureLogin() {
+		return failure("loginFirst")
+	}
+	login, emails, err := c.githubConnect(func(s githubStart) { showGithubCode(lang, s) })
+	if err != nil {
+		return err
+	}
+	all := slices.Clone(emails)
+	for _, e := range c.creds.Verified { // the noreply address aline.team kept with them
+		if noreply(e) && !slices.Contains(all, e) {
+			all = append(all, e)
+		}
+	}
+	if err := withLock(dir, func() error {
+		var err error
+		if cfg, err = loadConfig(dir); err != nil { // as it is now, after the minutes at GitHub
+			return err
+		}
+		addEmails(&cfg, all)
+		return saveConfig(dir, cfg)
+	}); err != nil {
+		return err
+	}
+	if jsonOut {
+		return printJSON(map[string]any{"github": login, "connected": all, "emails": emailsOf(cfg, c)})
+	}
+	say(lang, "githubConnected", login, strings.Join(all, ", "))
+	return nil
+}
+
 // emailsJSON is the work emails for a program: the primary first, each verified or not, and how to have it taken.
 func emailsJSON(cfg Config, c *client) error {
+	return printJSON(map[string]any{"emails": emailsOf(cfg, c)})
+}
+
+func emailsOf(cfg Config, c *client) []map[string]any {
 	list := []map[string]any{}
 	for i, e := range cfg.Emails {
 		list = append(list, c.verifyJSON(map[string]any{"email": e, "primary": i == 0, "verified": verified(c.creds, e), "noreply": noreply(e)}, e))
 	}
-	return printJSON(map[string]any{"emails": list})
+	return list
 }
 
 // checkEmails asks, once, a user set up before 0.2.0 to verify the work emails: aline.team now takes a

@@ -339,10 +339,7 @@ func wrongCode(err error) bool {
 // shows the device and the time in its time zone, in its language for a new account) and to verify
 // (language and time zone set up a new account).
 func (c *client) startSignIn(email string) (codeStart, error) {
-	device := map[string]string{"name": deviceName(), "language": strings.ToUpper(detectLang(os.Getenv))}
-	if tz := localTimezone(); tz != "" {
-		device["timezone"] = tz
-	}
+	device := deviceInfo()
 	var start struct {
 		ChallengeID   string `json:"challengeId"`
 		AccountExists bool   `json:"accountExists"`
@@ -354,6 +351,16 @@ func (c *client) startSignIn(email string) (codeStart, error) {
 	return codeStart{map[string]any{"challengeId": start.ChallengeID, "device": device}, start.AccountExists, cmp.Or(start.CodeLength, 6)}, nil
 }
 
+// deviceInfo is the device a sign-in tells aline.team about: the OS and CPU, the screen language and
+// the time zone (left out when unknown).
+func deviceInfo() map[string]string {
+	device := map[string]string{"name": deviceName(), "language": strings.ToUpper(detectLang(os.Getenv))}
+	if tz := localTimezone(); tz != "" {
+		device["timezone"] = tz
+	}
+	return device
+}
+
 // finishSignIn tries one code and, when it is right, stores the token.
 func (c *client) finishSignIn(s codeStart, code string) (signInResult, error) {
 	var res signInResult
@@ -361,10 +368,118 @@ func (c *client) finishSignIn(s codeStart, code string) (signInResult, error) {
 	if err := c.send("POST", "/cli/verify", s.req, &res, false); err != nil {
 		return res, err
 	}
+	return res, c.keepLogin(res)
+}
+
+// keepLogin stores the token of a sign-in, for this server only.
+func (c *client) keepLogin(res signInResult) error {
 	c.creds.Token, c.creds.TokenExpiresAt, c.creds.Email = res.Token, res.TokenExpiresAt, res.Account.Email
 	c.creds.Server = c.base
 	c.creds.Verified = lowered(res.VerifiedEmails)
-	return res, saveCredentials(c.dir, c.creds)
+	return saveCredentials(c.dir, c.creds)
+}
+
+// githubStart is a GitHub device code aline.team asked GitHub for: the user enters UserCode at
+// VerificationURI and approves, while GitFolio asks every Interval seconds whether they did.
+type githubStart struct {
+	ConnectID       string `json:"connectId"`
+	UserCode        string `json:"userCode"`
+	VerificationURI string `json:"verificationUri"`
+	ExpiresAt       string `json:"expiresAt"`
+	Interval        int    `json:"interval"`
+}
+
+// githubWait waits the seconds aline.team asks for between two looks (shorter in tests).
+var githubWait = func(seconds int) { time.Sleep(time.Duration(max(seconds, 1)) * time.Second) }
+
+// githubFlow starts a GitHub device flow at path (POST), tells the user where to enter the code
+// (started), and looks at path/<connectId> until it is no longer PENDING. It returns that status, the
+// answer decoded into out. aline.team's EX001 (it could not ask GitHub) becomes githubUnavailable.
+func (c *client) githubFlow(path string, body any, auth bool, started func(githubStart), out any) (string, error) {
+	var s githubStart
+	start := func() error { return c.send("POST", path, body, &s, false) }
+	if auth {
+		start = func() error { return c.call("POST", path, body, &s) }
+	}
+	var ae *apiError
+	if err := start(); errors.As(err, &ae) && ae.Code == "EX001" {
+		return "", failure("githubUnavailable")
+	} else if err != nil {
+		return "", err
+	}
+	started(s)
+	for interval := s.Interval; ; {
+		githubWait(interval)
+		var raw json.RawMessage
+		if err := c.send("GET", path+"/"+url.PathEscape(s.ConnectID), nil, &raw, auth); err != nil {
+			return "", err
+		}
+		var st struct {
+			Status   string `json:"status"`
+			Interval int    `json:"interval"`
+		}
+		if err := json.Unmarshal(raw, &st); err != nil {
+			return "", err
+		}
+		if st.Status != "PENDING" {
+			return st.Status, json.Unmarshal(raw, out)
+		}
+		interval = cmp.Or(st.Interval, interval) // longer when GitHub asks to slow down
+	}
+}
+
+// githubLogin signs in with the user's GitHub account: its primary verified email is the aline.team
+// account. Without an account it fails with githubNoAccount unless signup (the user agreed to the terms
+// and the privacy policy; notify: service emails), which signs one up. It also returns the GitHub login.
+func (c *client) githubLogin(signup, notify bool, started func(githubStart)) (signInResult, string, error) {
+	body := map[string]any{"device": deviceInfo(), "signup": signup}
+	if signup {
+		body["isNotified"] = notify
+	}
+	var res struct {
+		signInResult
+		Login string `json:"login"`
+	}
+	status, err := c.githubFlow("/cli/login/github", body, false, started, &res)
+	if err == nil {
+		err = githubEnd(status, "githubNoAccount")
+	}
+	if err != nil {
+		return signInResult{}, "", err
+	}
+	return res.signInResult, res.Login, c.keepLogin(res.signInResult)
+}
+
+// githubConnect links the user's GitHub account to their aline.team account: aline.team takes its
+// verified emails, and its noreply address, as verified work emails. It returns the GitHub login and
+// those emails.
+func (c *client) githubConnect(started func(githubStart)) (string, []string, error) {
+	var res struct {
+		Login  string   `json:"login"`
+		Emails []string `json:"emails"`
+	}
+	status, err := c.githubFlow("/cli/github", nil, true, started, &res)
+	if err == nil {
+		err = githubEnd(status, "")
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	_, err = c.me() // the verified emails now, with the noreply address
+	return res.Login, lowered(res.Emails), err
+}
+
+// githubEnd is the error for how a GitHub device flow ended: nil when it went through.
+func githubEnd(status, noAccount string) error {
+	switch status {
+	case "LOGGED_IN", "CONNECTED":
+		return nil
+	case "NO_ACCOUNT":
+		return failure(noAccount)
+	case "DENIED":
+		return failure("githubDenied")
+	}
+	return failure("githubExpired")
 }
 
 // meResult is the body of GET /cli/me, also returned by the work email calls.

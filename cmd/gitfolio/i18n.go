@@ -175,6 +175,11 @@ func tr(lang, key string) string {
 // the way out itself (by the error code). Same keys and arguments as in messages. "usage" stays: it
 // means the program called a command wrongly.
 var appMessages = map[string]map[string]string{
+	"githubUnavailable": {
+		"en": "aline.team cannot use GitHub to sign in right now. Use an email code instead.\n",
+		"ko": "지금은 aline.team이 GitHub 로그인을 쓸 수 없습니다. 이메일 코드를 쓰세요.\n",
+		"ja": "現在 aline.team は GitHub でのサインインを使えません。メールのコードを使ってください。\n",
+	},
 	"portfolioNoBrowser": {
 		"en": "Making a PDF takes Chrome, Edge or Chromium, and none was found (CHROME_PATH can name one).\nWithout one, make the portfolio as Markdown and print it from a Markdown editor.\n",
 		"ko": "PDF를 만들려면 Chrome·Edge·Chromium이 필요한데 찾지 못했습니다(CHROME_PATH로 지정 가능).\n없으면 포트폴리오를 Markdown으로 만든 뒤 Markdown 편집기에서 인쇄하세요.\n",
@@ -730,6 +735,51 @@ var messages = map[string]map[string]string{
 		"en": "There is no aline.team account for %s, so a new one will be created.\nSigning up means you agree to\n  Terms of Service: https://aline.team/terms\n  Privacy Policy:   https://aline.team/privacy\n",
 		"ko": "%s(으)로 된 aline.team 계정이 없어 새 계정을 만듭니다.\n가입하면 아래 내용에 동의한 것으로 간주합니다.\n  이용약관: https://aline.team/terms\n  개인정보처리방침: https://aline.team/privacy\n",
 		"ja": "%s の aline.team アカウントがないため、新しいアカウントを作成します。\n登録すると、以下に同意したものとみなされます。\n  利用規約: https://aline.team/terms\n  プライバシーポリシー: https://aline.team/privacy\n",
+	},
+	"loginGithubAsk": {
+		"en": "Log in with your GitHub account? (no: with a code sent to an email you type)",
+		"ko": "GitHub 계정으로 로그인할까요? (아니요: 입력한 이메일로 받은 코드로)",
+		"ja": "GitHub アカウントでログインしますか?(いいえ: 入力したメールアドレスに届くコードで)",
+	},
+	"githubCode": {
+		"en": "Open %s, enter the code %s and approve GitFolio. Waiting for GitHub...\n",
+		"ko": "%s 에서 코드 %s 를 입력하고 GitFolio를 승인하세요. GitHub를 기다리는 중...\n",
+		"ja": "%s を開いてコード %s を入力し、GitFolio を承認してください。GitHub を待っています...\n",
+	},
+	"githubEmail": {
+		"en": "the primary email of your GitHub account",
+		"ko": "GitHub 계정의 대표 이메일",
+		"ja": "GitHub アカウントのメインのメールアドレス",
+	},
+	"signupAskGithub": {
+		"en": "Create the account? (a new GitHub code follows)",
+		"ko": "계정을 만들까요? (GitHub 코드를 한 번 더 받습니다)",
+		"ja": "アカウントを作成しますか?(GitHub のコードをもう一度受け取ります)",
+	},
+	"githubNoAccount": {
+		"en": "No aline.team account has the primary email of your GitHub account.\n",
+		"ko": "GitHub 계정의 대표 이메일로 된 aline.team 계정이 없습니다.\n",
+		"ja": "GitHub アカウントのメインのメールアドレスの aline.team アカウントはありません。\n",
+	},
+	"githubDenied": {
+		"en": "GitHub says the request was denied. Run it again to try once more.\n",
+		"ko": "GitHub에서 요청이 거절됐습니다. 다시 하려면 한 번 더 실행하세요.\n",
+		"ja": "GitHub でリクエストが拒否されました。もう一度実行するとやり直せます。\n",
+	},
+	"githubExpired": {
+		"en": "The GitHub code ran out before it was approved. Run it again for a new one.\n",
+		"ko": "승인 전에 GitHub 코드가 만료됐습니다. 새 코드를 받으려면 다시 실행하세요.\n",
+		"ja": "承認前に GitHub のコードの期限が切れました。もう一度実行すると新しいコードを受け取ります。\n",
+	},
+	"githubUnavailable": {
+		"en": "aline.team cannot use GitHub to sign in right now. Use an email code instead (`gitfolio login`, `gitfolio email verify`).\n",
+		"ko": "지금은 aline.team이 GitHub 로그인을 쓸 수 없습니다. 이메일 코드를 쓰세요(`gitfolio login`, `gitfolio email verify`).\n",
+		"ja": "現在 aline.team は GitHub でのサインインを使えません。メールのコードを使ってください(`gitfolio login`、`gitfolio email verify`)。\n",
+	},
+	"githubConnected": {
+		"en": "Connected the GitHub account %s: aline.team takes commits under these emails now: %s\n",
+		"ko": "GitHub 계정 %s 를 연결했습니다. 이제 aline.team이 이 이메일들의 커밋을 받습니다: %s\n",
+		"ja": "GitHub アカウント %s を連携しました。これから aline.team は次のメールアドレスのコミットを受け付けます: %s\n",
 	},
 	"signupAsk": {
 		"en": "Create the account? (check the email for typos)",

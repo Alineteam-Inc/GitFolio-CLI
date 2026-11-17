@@ -89,6 +89,11 @@ type fakeAline struct {
 	modified    map[string]string   // provider/namespace/name → modifiedAt
 	batches     int                 // accepted commit batches
 	down        bool                // answer data calls with 503
+
+	// GitHub device flows: the user approves on the second look (the first is PENDING).
+	noGithub bool // aline.team cannot ask GitHub (EX001)
+	ghLooks  int  // status looks so far, for the flow under way
+	ghSignup bool // the login flow under way may sign up
 }
 
 // me is the body of GET /cli/me: the account email first, then the verified work emails.
@@ -159,6 +164,62 @@ func (f *fakeAline) handler() http.Handler {
 			"account":        map[string]any{"id": testAccountID, "email": "dev@example.com", "created": !f.exists},
 			"verifiedEmails": []string{"dev@example.com"},
 		})
+	})
+	ghStart := func(w http.ResponseWriter) {
+		if f.noGithub {
+			fail(w, 503, "EX001")
+			return
+		}
+		f.ghLooks = 0
+		ok(w, map[string]any{"connectId": "c_1", "userCode": "WDJB-MJHT", "verificationUri": "https://github.com/login/device",
+			"expiresAt": time.Now().UTC().Add(15 * time.Minute), "interval": 5})
+	}
+	mux.HandleFunc("POST /cli/login/github", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Device     struct{ Name, Language string }
+			Signup     bool  `json:"signup"`
+			IsNotified *bool `json:"isNotified"`
+		}
+		if r.Header.Get("Authorization") != "" || json.NewDecoder(r.Body).Decode(&in) != nil || in.Device.Name == "" {
+			fail(w, 400, "C001") // a GitHub login carries no token: a wrong one would be refused
+			return
+		}
+		f.ghSignup, f.notified = in.Signup, in.IsNotified
+		ghStart(w)
+	})
+	mux.HandleFunc("GET /cli/login/github/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch f.ghLooks++; {
+		case r.PathValue("id") != "c_1":
+			ok(w, map[string]any{"status": "EXPIRED", "interval": 5})
+		case f.ghLooks == 1:
+			ok(w, map[string]any{"status": "PENDING", "interval": 10}) // GitHub asked to slow down
+		case !f.exists && !f.ghSignup:
+			ok(w, map[string]any{"status": "NO_ACCOUNT", "interval": 10})
+		default:
+			f.token = testToken
+			ok(w, map[string]any{"status": "LOGGED_IN", "interval": 10, "login": "octocat",
+				"token": f.token, "tokenExpiresAt": time.Now().UTC().Add(90 * 24 * time.Hour),
+				"account":        map[string]any{"id": testAccountID, "email": "dev@example.com", "created": !f.exists},
+				"verifiedEmails": []string{"dev@example.com"}})
+		}
+	})
+	mux.HandleFunc("POST /cli/github", func(w http.ResponseWriter, r *http.Request) {
+		if !authed(r) {
+			fail(w, 401, "A001")
+			return
+		}
+		ghStart(w)
+	})
+	mux.HandleFunc("GET /cli/github/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch f.ghLooks++; {
+		case !authed(r):
+			fail(w, 401, "A001")
+		case f.ghLooks == 1:
+			ok(w, map[string]any{"status": "PENDING", "interval": 5})
+		default: // the verified emails of the GitHub account, and its noreply address, are work emails now
+			f.work = append(f.work, "dev@work.example", "583231+octocat@users.noreply.github.com")
+			ok(w, map[string]any{"status": "CONNECTED", "interval": 5, "login": "octocat", "emails": []string{"Dev@Work.example"}})
+		}
 	})
 	mux.HandleFunc("GET /cli/me", func(w http.ResponseWriter, r *http.Request) {
 		if !authed(r) {
@@ -554,8 +615,8 @@ func TestLoginAgain(t *testing.T) {
 		t.Error("the new token was not saved")
 	}
 
-	// No email to send the code to (say the login was for another server): the email is asked for.
-	stdin = bufio.NewReader(strings.NewReader("dev@example.com\n123456\n"))
+	// No email to send the code to (say the login was for another server): GitHub or an email is asked for.
+	stdin = bufio.NewReader(strings.NewReader("n\ndev@example.com\n123456\n"))
 	if err := saveCredentials(dir, Credentials{Token: "aln_cli_expired", Server: srv.URL}); err != nil {
 		t.Fatal(err)
 	}
@@ -655,5 +716,114 @@ func TestLoginInTwoRuns(t *testing.T) {
 		if got := errorCode(&apiError{Status: 400, Code: code}); got != want {
 			t.Errorf("errorCode(%s) = %s, want %s", code, got, want)
 		}
+	}
+}
+
+// Logging in with GitHub: the code goes where the program or the person sees it, at the pace aline.team
+// asks for, and the GitHub account's primary email is the account. Without one the sign-up is agreed to
+// first, then a new code signs it up. When aline.team cannot ask GitHub, a person is asked for an email.
+func TestGithubLogin(t *testing.T) {
+	f := &fakeAline{exists: true}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	t.Setenv("GITFOLIO_API_URL", srv.URL)
+	t.Setenv("GITFOLIO_LANG", "en")
+	defer func(w func(int)) { githubWait = w }(githubWait)
+	var waits []int
+	githubWait = func(s int) { waits = append(waits, s) }
+	defer func(o, e io.Writer, i func() bool, r *bufio.Reader) {
+		out, errOut, interactive, stdin, jsonOut = o, e, i, r, false
+	}(out, errOut, interactive, stdin)
+	var screen bytes.Buffer
+	out, errOut, interactive = &screen, &screen, func() bool { return false }
+	dir := t.TempDir()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	v, err := jsonStdout(t, func() error { return cmdLogin(dir, []string{"--github", "--json"}) })
+	if err != nil || v["email"] != "dev@example.com" || v["github"] != "octocat" || v["created"] != false ||
+		!strings.Contains(screen.String(), `"step":"githubCode"`) || !strings.Contains(screen.String(), `"userCode":"WDJB-MJHT"`) ||
+		!slices.Equal(waits, []int{5, 10}) {
+		t.Fatalf("login --github = %v, %v; waits %v\n%s", v, err, waits, screen.String())
+	}
+	if creds, _ := loadCredentials(dir); creds.Token != testToken || creds.Email != "dev@example.com" || creds.Server != srv.URL {
+		t.Errorf("credentials: %+v", creds)
+	}
+
+	// No account: a program is told to ask for the sign-up first, then signs up with --signup.
+	must(saveCredentials(dir, Credentials{}))
+	f.exists = false
+	_, err = jsonStdout(t, func() error { return cmdLogin(dir, []string{"--github", "--json"}) })
+	if errorCode(err) != "signupConsent" || !strings.Contains(errorJSON(err)["signupNotice"], "GitHub") {
+		t.Errorf("no account, no --signup: %v %v", err, errorJSON(err))
+	}
+	v, err = jsonStdout(t, func() error { return cmdLogin(dir, []string{"--github", "--signup", "--notify", "--json"}) })
+	if err != nil || v["created"] != true || f.notified == nil || !*f.notified {
+		t.Errorf("login --github --signup --notify = %v, %v (notified %v)", v, err, f.notified)
+	}
+
+	// At a terminal GitHub comes first; without an account, the notice, a yes, and a new code.
+	must(saveCredentials(dir, Credentials{}))
+	jsonOut, screen = false, bytes.Buffer{}
+	interactive, stdin = func() bool { return true }, bufio.NewReader(strings.NewReader("\ny\nn\n"))
+	c, _ := newClient(dir)
+	if err := c.login("en"); err != nil || strings.Count(screen.String(), "enter the code WDJB-MJHT") != 2 ||
+		!strings.Contains(screen.String(), "Terms of Service") || f.notified == nil || *f.notified {
+		t.Errorf("login at a terminal: %v (notified %v)\n%s", err, f.notified, screen.String())
+	}
+
+	// aline.team cannot ask GitHub now: a program is told so; a person goes on with an email code.
+	must(saveCredentials(dir, Credentials{}))
+	f.noGithub, f.exists = true, true
+	_, err = jsonStdout(t, func() error { return cmdLogin(dir, []string{"--github", "--json"}) })
+	if errorCode(err) != "githubUnavailable" || strings.Contains(err.Error(), "gitfolio") {
+		t.Errorf("GitHub unavailable: %v", err)
+	}
+	jsonOut = false
+	stdin = bufio.NewReader(strings.NewReader("\ndev@example.com\n123456\n"))
+	c, _ = newClient(dir)
+	if err := c.login("en"); err != nil {
+		t.Errorf("an email after GitHub could not be used: %v", err)
+	}
+	if creds, _ := loadCredentials(dir); creds.Token != testToken {
+		t.Error("no login after the email code")
+	}
+}
+
+// Connecting GitHub makes its verified emails and its noreply address verified work emails, here too.
+func TestEmailGithub(t *testing.T) {
+	f := &fakeAline{token: testToken}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	t.Setenv("GITFOLIO_API_URL", srv.URL)
+	t.Setenv("GITFOLIO_LANG", "en")
+	defer func(w func(int)) { githubWait = w }(githubWait)
+	githubWait = func(int) {}
+	defer func(o, e io.Writer) { out, errOut, jsonOut = o, e, false }(out, errOut)
+	out, errOut = io.Discard, io.Discard
+	dir := t.TempDir()
+	if err := cmdEmail(dir, []string{"github", "--json"}); errorCode(err) != "loginFirst" {
+		t.Errorf("email github logged out: %v", err)
+	}
+	jsonOut = false
+	if err := saveCredentials(dir, Credentials{Token: testToken, Email: "dev@example.com", Server: srv.URL}); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveConfig(dir, Config{Emails: []string{"dev@example.com"}}); err != nil {
+		t.Fatal(err)
+	}
+	v, err := jsonStdout(t, func() error { return cmdEmail(dir, []string{"github", "--json"}) })
+	noreply := "583231+octocat@users.noreply.github.com"
+	if connected, _ := v["connected"].([]any); err != nil || v["github"] != "octocat" || len(connected) != 2 {
+		t.Fatalf("email github = %v, %v", v, err)
+	}
+	cfg, _ := loadConfig(dir)
+	creds, _ := loadCredentials(dir)
+	if !slices.Equal(cfg.Emails, []string{"dev@example.com", "dev@work.example", noreply}) || !verified(creds, "dev@work.example") || !verified(creds, noreply) {
+		t.Errorf("work emails %v, verified %v", cfg.Emails, creds.Verified)
 	}
 }

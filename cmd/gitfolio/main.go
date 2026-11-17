@@ -34,12 +34,15 @@ commands:
                         init's steps for a program, without questions: the data policy and what
                         starting GitFolio does, then (logged in) the repositories and emails found;
                         email, add, deps, config autosync and schedule set up what the user picks
-  login                 log in / sign up to aline.team with an email code (an email without an
-                        account is signed up)
+  login                 log in / sign up to aline.team with GitHub or an email code (an email
+                        without an account is signed up)
   login --email <email> [--code <code> [--signup [--notify]]] [--json]
                         the same without questions, in two runs: --email sends the code, --code
                         finishes (--signup: agree to sign up an email without an account,
                         --notify: also receive aline.team service notifications by email)
+  login --github [--signup [--notify]] [--json]
+                        log in with your GitHub account: approve a code at github.com; its primary
+                        verified email is the account (--signup: sign it up if it has none)
   logout [--json]       sign out: revoke and remove this device's token
   whoami [--json]       show the aline.team account this device is signed in to
   add [path] [--json]   register a repository, collect its commits and install git hooks
@@ -118,6 +121,8 @@ commands:
                         gets all of them under the primary one (the first, marked ★); verified
                         ones (✔, email code) merge the repositories linked on aline.team with them;
                         without a terminal, verify sends the code and verify --code finishes
+  email github [--json] connect your GitHub account: its verified emails and its noreply address
+                        become verified work emails at once (you approve a code at github.com)
   schedule [HH:MM | off] [--json]
                         optional daily sync at a local time, for pushes the hooks missed (launchd on
                         macOS, systemd or cron on Linux, Task Scheduler on Windows); no argument: show it
@@ -299,8 +304,10 @@ func run(args []string) error {
 	case "portfolio":
 		return cmdPortfolio(dir, args[1:]) // the same; reads this computer's data under the lock
 	case "email":
-		if len(withoutJSON(args[1:])) == 0 {
-			return cmdEmail(dir, args[1:]) // the list only reads, like whoami, and may wait on aline.team
+		// The list only reads, like whoami, and may wait on aline.team; github waits on the user at GitHub
+		// for minutes, so it takes the lock only to save.
+		if a := withoutJSON(args[1:]); len(a) == 0 || slices.Equal(a, []string{"github"}) {
+			return cmdEmail(dir, args[1:])
 		}
 	}
 	return withLock(dir, func() error {

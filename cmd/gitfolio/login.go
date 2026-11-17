@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,7 +11,7 @@ import (
 	"strings"
 )
 
-const loginUsage = "gitfolio login [--email <email> [--code <code> [--signup [--notify]]]] [--json]"
+const loginUsage = "gitfolio login [--email <email> [--code <code> [--signup [--notify]]] | --github [--signup [--notify]]] [--json]"
 
 // cmdLogin signs in to aline.team with an email code (DESIGN 6.1): asking at the terminal (login), or
 // in two runs a program makes without asking anything: --email sends the code, and --email with --code
@@ -21,10 +22,12 @@ func cmdLogin(dir string, args []string) error {
 	fs := flag.NewFlagSet("login", flag.ContinueOnError)
 	email := fs.String("email", "", "the account's email")
 	code := fs.String("code", "", "the code emailed by the first run")
+	github := fs.Bool("github", false, "log in with your GitHub account")
 	signup := fs.Bool("signup", false, "agree to sign up when the email has no account")
 	notify := fs.Bool("notify", false, "with --signup: receive aline.team service notifications by email")
 	fs.Bool("json", false, "print JSON")
-	if fs.Parse(args) != nil || fs.NArg() > 0 || (*email == "" && (*code != "" || *signup || *notify)) {
+	if fs.Parse(args) != nil || fs.NArg() > 0 || (*email == "" && !*github && (*code != "" || *signup || *notify)) ||
+		(*github && (*email != "" || *code != "")) {
 		return failure("usage", loginUsage)
 	}
 	lang := detectLang(os.Getenv)
@@ -38,6 +41,9 @@ func cmdLogin(dir string, args []string) error {
 		}
 		say(lang, "alreadyLoggedIn", c.creds.Email)
 		return nil
+	}
+	if *github {
+		return c.loginGithub(lang, *signup, *notify)
 	}
 	if *email == "" {
 		if !interactive() {
@@ -181,10 +187,61 @@ func keptCode(dir, kind, email string) (codeStart, bool, error) {
 	return codeStart{k.Req, k.Exists, k.Length}, ok, nil
 }
 
-// login asks for an email and signs in with a code sent to it; an email without an account is signed
-// up after showing the terms, the privacy policy and the email it will be made for.
+// loginGithub logs in with GitHub (githubLogin). Without an account, at a terminal the notice and the
+// questions of a sign-up come and a new code signs it up; a program gets signupConsent and runs it again
+// with --signup.
+func (c *client) loginGithub(lang string, signup, notify bool) error {
+	for {
+		res, login, err := c.githubLogin(signup, notify, func(s githubStart) { showGithubCode(lang, s) })
+		if errorCode(err) == "githubNoAccount" {
+			who := tr(lang, "githubEmail")
+			terms := fmt.Sprintf(tr(lang, "signupNotice"), who)
+			if jsonOut || !interactive() {
+				f := failure("signupConsent", who).(*failErr)
+				f.extra = map[string]string{"signupNotice": terms, "notifyQuestion": tr(lang, "notifyAsk")}
+				return f
+			}
+			notice(terms)
+			if !askYesNo(lang, "signupAskGithub", true) || stdinClosed {
+				say(lang, "signupCancelled")
+				return nil
+			}
+			signup, notify = true, askYesNo(lang, "notifyAsk", false)
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if jsonOut {
+			return printJSON(map[string]any{"email": res.Account.Email, "created": res.Account.Created, "verifiedEmails": res.VerifiedEmails, "github": login})
+		}
+		sayLoggedIn(lang, res)
+		return nil
+	}
+}
+
+// showGithubCode tells the user where to enter the GitHub code: for a program, a progress line on stderr.
+func showGithubCode(lang string, s githubStart) {
+	if jsonOut {
+		b, _ := json.Marshal(map[string]any{"progress": map[string]any{"step": "githubCode", "userCode": s.UserCode,
+			"verificationUri": s.VerificationURI, "expiresAt": s.ExpiresAt}})
+		fmt.Fprintln(errOut, string(b))
+		return
+	}
+	notice(fmt.Sprintf(tr(lang, "githubCode"), s.VerificationURI, s.UserCode))
+}
+
+// login signs in at a terminal: with GitHub, unless the user would rather have a code sent to an email
+// they type (or aline.team cannot use GitHub now). An email without an account is signed up after
+// showing the terms, the privacy policy and the email it will be made for.
 func (c *client) login(lang string) error {
 	section(lang, "loginTitle")
+	if askYesNo(lang, "loginGithubAsk", true) && !stdinClosed {
+		if err := c.loginGithub(lang, false, false); errorCode(err) != "githubUnavailable" {
+			return err
+		}
+		notice(tr(lang, "githubUnavailable"))
+	}
 	email := ""
 	for {
 		email = strings.TrimSpace(prompt(tr(lang, "emailAsk")))
