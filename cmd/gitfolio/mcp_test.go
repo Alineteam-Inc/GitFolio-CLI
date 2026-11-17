@@ -469,3 +469,62 @@ func TestMCPStatusMasksSyncError(t *testing.T) {
 		t.Errorf("lastSyncError = %q, %v", got, err)
 	}
 }
+
+// From an AI tool, GitHub is a start and checks: the code to show, pending until the user approves, then
+// logged in (signed up only once the user agreed) or the work emails verified.
+func TestMCPGithub(t *testing.T) {
+	f := &fakeAline{}
+	ts := httptest.NewServer(f.handler())
+	defer ts.Close()
+	t.Setenv("GITFOLIO_API_URL", ts.URL)
+	t.Setenv("GITFOLIO_LANG", "en")
+	dir := t.TempDir()
+	call := func(name string, args map[string]any) (map[string]any, error) {
+		t.Helper()
+		i := slices.IndexFunc(mcpTools, func(x mcpTool) bool { return x.Name == name })
+		v, err := mcpTools[i].run(dir, args)
+		if err != nil {
+			return nil, err
+		}
+		b, _ := json.Marshal(v)
+		var m map[string]any
+		_ = json.Unmarshal(b, &m)
+		return m, nil
+	}
+	if _, err := call("github_check", nil); err == nil || !strings.Contains(err.Error(), "login_github") {
+		t.Errorf("a check with nothing under way: %v", err)
+	}
+	if _, err := call("login_github", map[string]any{}); err == nil || !strings.Contains(err.Error(), "policy") {
+		t.Errorf("login_github without agreeing: %v", err)
+	}
+	if s, err := call("login_github", map[string]any{"agreed": true}); err != nil || s["userCode"] != "WDJB-MJHT" || s["verificationUri"] != "https://github.com/login/device" {
+		t.Fatalf("login_github = %v, %v", s, err)
+	}
+	if v, err := call("github_check", nil); err != nil || v["status"] != "PENDING" {
+		t.Fatalf("before approval: %v, %v", v, err)
+	}
+	if _, err := call("github_check", nil); err == nil || !strings.Contains(err.Error(), "Terms of Service") || !strings.Contains(err.Error(), "signup: true") {
+		t.Errorf("no account: %v", err)
+	}
+	if _, err := call("github_check", nil); err == nil {
+		t.Error("the ended login was looked at again")
+	}
+	if _, err := call("login_github", map[string]any{"agreed": true, "signup": true}); err != nil {
+		t.Fatal(err)
+	}
+	call("github_check", nil)
+	if v, err := call("github_check", nil); err != nil || v["loggedIn"] != true || v["newAccount"] != true || v["github"] != "octocat" {
+		t.Fatalf("signed up = %v, %v", v, err)
+	}
+	if _, err := call("connect_github", nil); err != nil {
+		t.Fatal(err)
+	}
+	call("github_check", nil)
+	v, err := call("github_check", nil)
+	if emails, _ := v["verifiedWorkEmails"].([]any); err != nil || v["connected"] != true || len(emails) != 2 {
+		t.Errorf("connected = %v, %v", v, err)
+	}
+	if cfg, _ := loadConfig(dir); !slices.Contains(cfg.Emails, "dev@work.example") {
+		t.Errorf("work emails %v", cfg.Emails)
+	}
+}

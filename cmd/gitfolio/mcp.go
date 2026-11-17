@@ -214,6 +214,38 @@ var mcpSetupTools = []mcpTool{
 		run:         mcpLoginVerify,
 	},
 	{
+		Name:  "login_github",
+		Title: "Log in with GitHub",
+		Description: "Start GitFolio for the user with their GitHub account instead of an email code: GitHub gives a code " +
+			"the user enters at verificationUri and approves there; their GitHub account's primary verified email is the " +
+			"aline.team account. Call only after showing the policy and getting the user's agreement (agreed: true). Then, " +
+			"once the user says they approved, call github_check. Already logged in: nothing happens.",
+		InputSchema: object(map[string]any{
+			"agreed":        prop("boolean", "The user agreed to the data policy, terms and privacy policy."),
+			"signup":        prop("boolean", "Sign up an account if there is none: only after github_check said there is none and the user agreed to signupNotice."),
+			"notifications": prop("boolean", "With signup: the user wants aline.team service emails. Only if they said yes."),
+		}, "agreed"),
+		Annotations: mcpWrites,
+		run:         mcpLoginGithub,
+	},
+	{
+		Name:  "connect_github",
+		Title: "Verify work emails with GitHub",
+		Description: "Connect the user's GitHub account to their aline.team account: its verified emails and its noreply " +
+			"address become verified work emails at once, instead of a code to each email. GitHub gives a code the user " +
+			"enters at verificationUri and approves there; then call github_check.",
+		Annotations: mcpWrites,
+		run:         mcpConnectGithub,
+	},
+	{
+		Name:  "github_check",
+		Title: "Check the GitHub approval",
+		Description: "Look once at the GitHub login or connection the user is approving: still pending (ask the user whether " +
+			"they approved, and call again a few seconds later), or done, with what it did.",
+		Annotations: mcpWrites,
+		run:         mcpGithubCheck,
+	},
+	{
 		Name:  "email_start",
 		Title: "Add a work email",
 		Description: "Add another email the user commits with (a repository's git user.email that is not their account email) " +
@@ -797,6 +829,108 @@ func mcpLoginVerify(dir string, args map[string]any) (any, error) {
 		r["webLogin"] = strings.TrimSpace(tr(lang, "passwordMail"))
 	}
 	return r, nil
+}
+
+// githubKept keeps the GitHub flow of purpose (login, connect) for github_check, or forgets it (s nil).
+func githubKept(dir, purpose string, s *githubStart) error {
+	var kept *codeStart
+	if s != nil {
+		kept = &codeStart{req: map[string]any{"connectId": s.ConnectID}}
+	}
+	return withLock(dir, func() error { return keepCode(dir, "github", purpose, kept) })
+}
+
+// githubStarted is what a tool that started a GitHub flow answers: where the user enters which code.
+func githubStarted(s githubStart) map[string]any {
+	return map[string]any{"userCode": s.UserCode, "verificationUri": s.VerificationURI, "expiresAt": s.ExpiresAt,
+		"next": "Tell the user to open verificationUri, enter userCode and approve GitFolio, then call github_check once they did."}
+}
+
+func mcpLoginGithub(dir string, args map[string]any) (any, error) {
+	if agreed, _ := args["agreed"].(bool); !agreed {
+		return nil, errors.New("show the user GitFolio's data policy and aline.team's terms (the policy tool), and call again with agreed: true once they agree")
+	}
+	signup, _ := args["signup"].(bool)
+	notify, _ := args["notifications"].(bool)
+	c, err := newClient(dir)
+	if err != nil {
+		return nil, err
+	}
+	if c.loggedIn() {
+		return map[string]any{"loggedIn": true, "email": c.creds.Email}, nil
+	}
+	s, err := c.githubBegin("/cli/login/github", githubLoginBody(signup, notify), false)
+	if err != nil {
+		return nil, err
+	}
+	return githubStarted(s), githubKept(dir, "login", &s)
+}
+
+func mcpConnectGithub(dir string, _ map[string]any) (any, error) {
+	c, err := newClient(dir)
+	if err != nil {
+		return nil, err
+	}
+	if !c.loggedIn() {
+		return nil, errors.New("not logged in: call login_start or login_github first")
+	}
+	s, err := c.githubBegin("/cli/github", nil, true)
+	if err != nil {
+		return nil, err
+	}
+	return githubStarted(s), githubKept(dir, "connect", &s)
+}
+
+func mcpGithubCheck(dir string, _ map[string]any) (any, error) {
+	c, err := newClient(dir)
+	if err != nil {
+		return nil, err
+	}
+	for _, purpose := range []string{"login", "connect"} {
+		s, ok, err := keptCode(dir, "github", purpose)
+		if err != nil {
+			return nil, err
+		}
+		id, _ := s.req["connectId"].(string)
+		if !ok || id == "" {
+			continue
+		}
+		var login githubLoginAnswer
+		var connect githubConnectAnswer
+		path, out := "/cli/login/github", any(&login)
+		if purpose == "connect" {
+			path, out = "/cli/github", &connect
+		}
+		status, _, err := c.githubLook(path, id, purpose == "connect", out)
+		if err == nil && status == "PENDING" {
+			return map[string]any{"status": "PENDING", "next": "Not approved yet: ask the user whether they did, and call github_check again a few seconds later."}, nil
+		}
+		if kerr := githubKept(dir, purpose, nil); err == nil { // done, or a look that failed: started again
+			err = kerr
+		}
+		if purpose == "connect" {
+			gh, emails, err := c.githubConnected(status, connect, err)
+			if err != nil {
+				return nil, err
+			}
+			all, err := addGithubEmails(dir, c, emails)
+			return map[string]any{"connected": true, "github": gh, "verifiedWorkEmails": all}, err
+		}
+		res, gh, err := c.githubLoggedIn(status, login, err)
+		if errorCode(err) == "githubNoAccount" {
+			lang := detectLang(os.Getenv)
+			return nil, fmt.Errorf("%s\n%sShow the user this and, once they agree, call login_github with signup: true "+
+				"(notifications: true only if they want aline.team service emails); GitHub gives a new code.",
+				strings.TrimSpace(err.Error()), fmt.Sprintf(tr(lang, "signupNotice"), tr(lang, "githubEmail")))
+		}
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"loggedIn": true, "email": res.Account.Email, "newAccount": res.Account.Created, "github": gh,
+			"next": "Register the user's repositories with add_repository, choose the sync mode with set_sync_mode, and agree " +
+				"with the user what AI tools may see of each repository (set_ai_exposure)."}, nil
+	}
+	return nil, errors.New("no GitHub login or connection is under way: call login_github or connect_github first")
 }
 
 func mcpEmailStart(dir string, args map[string]any) (any, error) {

@@ -282,20 +282,11 @@ func emailsFromGithub(dir, lang string, c *client, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	all := slices.Clone(emails)
-	for _, e := range c.creds.Verified { // the noreply address aline.team kept with them
-		if noreply(e) && !slices.Contains(all, e) {
-			all = append(all, e)
-		}
+	all, err := addGithubEmails(dir, c, emails)
+	if err != nil {
+		return err
 	}
-	if err := withLock(dir, func() error {
-		var err error
-		if cfg, err = loadConfig(dir); err != nil { // as it is now, after the minutes at GitHub
-			return err
-		}
-		addEmails(&cfg, all)
-		return saveConfig(dir, cfg)
-	}); err != nil {
+	if cfg, err = loadConfig(dir); err != nil {
 		return err
 	}
 	if jsonOut {
@@ -303,6 +294,25 @@ func emailsFromGithub(dir, lang string, c *client, cfg Config) error {
 	}
 	say(lang, "githubConnected", login, strings.Join(all, ", "))
 	return nil
+}
+
+// addGithubEmails adds the emails a GitHub connection verified, and the noreply address aline.team kept
+// with them, to the work emails; it returns them all.
+func addGithubEmails(dir string, c *client, emails []string) ([]string, error) {
+	all := slices.Clone(emails)
+	for _, e := range c.creds.Verified {
+		if noreply(e) && !slices.Contains(all, e) {
+			all = append(all, e)
+		}
+	}
+	return all, withLock(dir, func() error {
+		cfg, err := loadConfig(dir) // as it is now, after the minutes at GitHub
+		if err != nil {
+			return err
+		}
+		addEmails(&cfg, all)
+		return saveConfig(dir, cfg)
+	})
 }
 
 // emailsJSON is the work emails for a program: the primary first, each verified or not, and how to have it taken.

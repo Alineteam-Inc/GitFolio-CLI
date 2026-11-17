@@ -392,55 +392,92 @@ type githubStart struct {
 // githubWait waits the seconds aline.team asks for between two looks (shorter in tests).
 var githubWait = func(seconds int) { time.Sleep(time.Duration(max(seconds, 1)) * time.Second) }
 
-// githubFlow starts a GitHub device flow at path (POST), tells the user where to enter the code
-// (started), and looks at path/<connectId> until it is no longer PENDING. It returns that status, the
-// answer decoded into out. aline.team's EX001 (it could not ask GitHub) becomes githubUnavailable.
-func (c *client) githubFlow(path string, body any, auth bool, started func(githubStart), out any) (string, error) {
+// githubBegin asks aline.team to start a GitHub device flow at path. Its EX001 (it could not ask
+// GitHub) becomes githubUnavailable.
+func (c *client) githubBegin(path string, body any, auth bool) (githubStart, error) {
 	var s githubStart
-	start := func() error { return c.send("POST", path, body, &s, false) }
+	var err error
 	if auth {
-		start = func() error { return c.call("POST", path, body, &s) }
+		err = c.call("POST", path, body, &s)
+	} else {
+		err = c.send("POST", path, body, &s, false)
 	}
 	var ae *apiError
-	if err := start(); errors.As(err, &ae) && ae.Code == "EX001" {
-		return "", failure("githubUnavailable")
-	} else if err != nil {
+	if errors.As(err, &ae) && ae.Code == "EX001" {
+		return s, failure("githubUnavailable")
+	}
+	return s, err
+}
+
+// githubLook looks once at the GitHub device flow id started at path: its status, the seconds to wait
+// before the next look (longer when GitHub asks to slow down), and the answer decoded into out.
+func (c *client) githubLook(path, id string, auth bool, out any) (string, int, error) {
+	var raw json.RawMessage
+	if err := c.send("GET", path+"/"+url.PathEscape(id), nil, &raw, auth); err != nil {
+		return "", 0, err
+	}
+	var st struct {
+		Status   string `json:"status"`
+		Interval int    `json:"interval"`
+	}
+	if err := json.Unmarshal(raw, &st); err != nil {
+		return "", 0, err
+	}
+	return st.Status, st.Interval, json.Unmarshal(raw, out)
+}
+
+// githubFlow starts a GitHub device flow at path, tells the user where to enter the code (started),
+// and looks at it at the pace aline.team asks for until it is no longer PENDING.
+func (c *client) githubFlow(path string, body any, auth bool, started func(githubStart), out any) (string, error) {
+	s, err := c.githubBegin(path, body, auth)
+	if err != nil {
 		return "", err
 	}
 	started(s)
 	for interval := s.Interval; ; {
 		githubWait(interval)
-		var raw json.RawMessage
-		if err := c.send("GET", path+"/"+url.PathEscape(s.ConnectID), nil, &raw, auth); err != nil {
-			return "", err
+		status, next, err := c.githubLook(path, s.ConnectID, auth, out)
+		if err != nil || status != "PENDING" {
+			return status, err
 		}
-		var st struct {
-			Status   string `json:"status"`
-			Interval int    `json:"interval"`
-		}
-		if err := json.Unmarshal(raw, &st); err != nil {
-			return "", err
-		}
-		if st.Status != "PENDING" {
-			return st.Status, json.Unmarshal(raw, out)
-		}
-		interval = cmp.Or(st.Interval, interval) // longer when GitHub asks to slow down
+		interval = cmp.Or(next, interval)
 	}
 }
 
-// githubLogin signs in with the user's GitHub account: its primary verified email is the aline.team
-// account. Without an account it fails with githubNoAccount unless signup (the user agreed to the terms
-// and the privacy policy; notify: service emails), which signs one up. It also returns the GitHub login.
-func (c *client) githubLogin(signup, notify bool, started func(githubStart)) (signInResult, string, error) {
+// githubLoginAnswer is a GitHub login's last status answer: the sign-in itself once LOGGED_IN.
+type githubLoginAnswer struct {
+	signInResult
+	Login string `json:"login"`
+}
+
+// githubConnectAnswer is a GitHub connection's last status answer: once CONNECTED, the GitHub login and
+// the emails aline.team took.
+type githubConnectAnswer struct {
+	Login  string   `json:"login"`
+	Emails []string `json:"emails"`
+}
+
+// githubLoginBody is what starts a GitHub login: signup (the user agreed to the terms and the privacy
+// policy) signs up an account for the GitHub account's primary email; notify, service emails.
+func githubLoginBody(signup, notify bool) map[string]any {
 	body := map[string]any{"device": deviceInfo(), "signup": signup}
 	if signup {
 		body["isNotified"] = notify
 	}
-	var res struct {
-		signInResult
-		Login string `json:"login"`
-	}
-	status, err := c.githubFlow("/cli/login/github", body, false, started, &res)
+	return body
+}
+
+// githubLogin signs in with the user's GitHub account: its primary verified email is the aline.team
+// account. Without an account it fails with githubNoAccount unless signup (githubLoginBody). It also
+// returns the GitHub login.
+func (c *client) githubLogin(signup, notify bool, started func(githubStart)) (signInResult, string, error) {
+	var res githubLoginAnswer
+	status, err := c.githubFlow("/cli/login/github", githubLoginBody(signup, notify), false, started, &res)
+	return c.githubLoggedIn(status, res, err)
+}
+
+// githubLoggedIn ends a GitHub login: the token kept when it went through.
+func (c *client) githubLoggedIn(status string, res githubLoginAnswer, err error) (signInResult, string, error) {
 	if err == nil {
 		err = githubEnd(status, "githubNoAccount")
 	}
@@ -454,11 +491,13 @@ func (c *client) githubLogin(signup, notify bool, started func(githubStart)) (si
 // verified emails, and its noreply address, as verified work emails. It returns the GitHub login and
 // those emails.
 func (c *client) githubConnect(started func(githubStart)) (string, []string, error) {
-	var res struct {
-		Login  string   `json:"login"`
-		Emails []string `json:"emails"`
-	}
+	var res githubConnectAnswer
 	status, err := c.githubFlow("/cli/github", nil, true, started, &res)
+	return c.githubConnected(status, res, err)
+}
+
+// githubConnected ends a GitHub connection: the verified emails fetched again when it went through.
+func (c *client) githubConnected(status string, res githubConnectAnswer, err error) (string, []string, error) {
 	if err == nil {
 		err = githubEnd(status, "")
 	}

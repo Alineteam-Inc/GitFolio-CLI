@@ -21,18 +21,26 @@ ask, and never guess an email, a code or a repository.
      chosen repositories, data kept on this computer, what is sent and when, a daily sync in the
      scheduler, what AI tools see.
    Go on only when the user agrees. Before each later step that does one of these, say so again in a line.
-3. **Email (required).** Ask for the email to use. You may mention the git email of this repository, but
-   the user decides. Call `login_start` with `agreed: true`. Then ask for the code from the email and call
-   `login_verify`; the user may instead enter it in the GitFolio app or a terminal (`enterCode`), and then
-   you check with `status` that they are logged in. A new account: show `signupNotice`, call
-   `login_verify` with `signup: true` only once they agree, and ask whether they want aline.team service
-   emails (`notifications`: no unless they say yes).
+3. **Log in (required).** Ask whether to log in with GitHub or with an email code.
+   - GitHub: call `login_github` with `agreed: true`, show the user `userCode` and `verificationUri`, and
+     call `github_check` once they say they approved there (again a little later while it is pending).
+     No account yet: show the notice it gives, and call `login_github` with `signup: true` only once they
+     agree (a new code follows).
+   - Email: ask for the email to use. You may mention the git email of this repository, but the user
+     decides. Call `login_start` with `agreed: true`. Then ask for the code from the email and call
+     `login_verify`; the user may instead enter it in the GitFolio app or a terminal (`enterCode`), and
+     then you check with `status` that they are logged in. A new account: show `signupNotice` and call
+     `login_verify` with `signup: true` only once they agree.
+   For a new account, ask whether they want aline.team service emails (`notifications`: no unless they
+   say yes).
 4. **Repositories.** Ask which repositories to register (suggest the current one). Tell them each gets git
    hooks (post-commit, pre-push) on this computer only: nothing is added to the repository or its remote,
-   and `gitfolio remove` undoes it. Call `add_repository` for each. If a repository's git email is not the account's, offer
-   `email_start`: aline.team takes commits only under verified emails. Ask for that code and call
-   `email_verify`, or let the user enter it in the app or a terminal (`enterCode`). A noreply address gets
-   no code: `email_start` names the aline.team page where the user links its GitHub or GitLab account instead.
+   and `gitfolio remove` undoes it. Call `add_repository` for each. If a repository's git email is not the
+   account's, it needs verifying: aline.team takes commits only under verified emails. Offer
+   `connect_github` first (then `github_check`): the user's verified GitHub emails and GitHub noreply
+   address count at once. For any other email, `email_start`: ask for that code and call `email_verify`,
+   or let the user enter it in the app or a terminal (`enterCode`). A GitLab noreply address gets no code:
+   `email_start` names the aline.team page where the user links its GitLab account instead.
 5. **What AI tools may see**, for each repository:
    - First read the codebase's own rules: `CLAUDE.md`, `AGENTS.md`, `.cursor/rules`, `CONTRIBUTING`,
      security or confidentiality notes. Note anything about company or customer names, confidential

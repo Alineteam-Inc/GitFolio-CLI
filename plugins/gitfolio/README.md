@@ -13,9 +13,11 @@ those two. Through the [GitFolio CLI](https://github.com/Alineteam-Inc/GitFolio-
   `commits` (only where you show messages), `stack` (tech stack periods), `tech` (your experience with the
   techs of the repository you work in, or with one tech and where it comes from), `devtype` (your type, scores
   and aline.team's reasoning), `portfolio` (a Markdown draft), `ai_settings`.
-- To set GitFolio up for you: `policy`, `login_start` and `login_verify` (your email and its code, which
-  you can also enter in the GitFolio app or a terminal), `email_start` and `email_verify` (a work email and
-  its code, likewise), `add_repository`, `set_sync_mode`, `set_ai_exposure`.
+- To set GitFolio up for you: `policy`, `login_github` and `github_check` (with your GitHub account), or
+  `login_start` and `login_verify` (your email and its code, which
+  you can also enter in the GitFolio app or a terminal), `connect_github` (your GitHub emails verified at
+  once), `email_start` and `email_verify` (a work email and its code, likewise), `add_repository`,
+  `set_sync_mode`, `set_ai_exposure`.
   Your AI tool asks before each. Nothing can be removed or deleted through it.
 
 **Skills:** `setup` (start GitFolio and decide what to share), `portfolio` (a short interview, then your
