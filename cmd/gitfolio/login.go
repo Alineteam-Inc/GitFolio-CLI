@@ -26,8 +26,10 @@ func cmdLogin(dir string, args []string) error {
 	signup := fs.Bool("signup", false, "agree to sign up when the email has no account")
 	notify := fs.Bool("notify", false, "with --signup: receive aline.team service notifications by email")
 	fs.Bool("json", false, "print JSON")
-	if fs.Parse(args) != nil || fs.NArg() > 0 || (*email == "" && !*github && (*code != "" || *signup || *notify)) ||
-		(*github && (*email != "" || *code != "")) {
+	if err := parseFlags(fs, args, loginUsage); err != nil { // a flag it does not take: no flag package text on stderr
+		return err
+	}
+	if fs.NArg() > 0 || (*email == "" && !*github && (*code != "" || *signup || *notify)) || (*github && (*email != "" || *code != "")) {
 		return failure("usage", loginUsage)
 	}
 	lang := detectLang(os.Getenv)

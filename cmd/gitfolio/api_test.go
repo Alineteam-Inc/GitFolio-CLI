@@ -744,6 +744,9 @@ func TestGithubLogin(t *testing.T) {
 		}
 	}
 
+	if err := cmdLogin(dir, []string{"--gihub"}); errorCode(err) != "didYouMeanWord" || strings.Contains(screen.String(), "Usage of") {
+		t.Errorf("a mistyped flag: %v\n%s", err, screen.String()) // named, without the flag package's own text
+	}
 	v, err := jsonStdout(t, func() error { return cmdLogin(dir, []string{"--github", "--json"}) })
 	if err != nil || v["email"] != "dev@example.com" || v["github"] != "octocat" || v["created"] != false ||
 		!strings.Contains(screen.String(), `"step":"githubCode"`) || !strings.Contains(screen.String(), `"userCode":"WDJB-MJHT"`) ||
