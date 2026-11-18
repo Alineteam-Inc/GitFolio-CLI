@@ -33,9 +33,9 @@ ask, and never guess an email, a code or a repository.
      `login_verify` with `signup: true` only once they agree.
    For a new account, ask whether they want aline.team service emails (`notifications`: no unless they
    say yes).
-4. **Repositories.** Ask which repositories to register (suggest the current one). Tell them each gets git
-   hooks (post-commit, pre-push) on this computer only: nothing is added to the repository or its remote,
-   and `gitfolio remove` undoes it. Call `add_repository` for each. If a repository's git email is not the
+4. **Repositories.** Ask which repositories to register (suggest the current one). Tell them each gets a git
+   hook (pre-push) on this computer only: nothing is added to the repository or its remote, and
+   `gitfolio remove` undoes it. Call `add_repository` for each. If a repository's git email is not the
    account's, it needs verifying: aline.team takes commits only under verified emails. Offer
    `connect_github` first (then `github_check`): the user's verified GitHub emails and GitHub noreply
    address count at once. For any other email, `email_start`: ask for that code and call `email_verify`,

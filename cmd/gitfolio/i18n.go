@@ -279,9 +279,9 @@ var appMessages = map[string]map[string]string{
 		"en": ` [What starting GitFolio does]
  - Logs in to aline.team; an email without an account gets a new one
    (agreeing to the terms of service and the privacy policy).
- - Installs git hooks (post-commit, pre-push) in the repositories you
-   choose, on this computer only: nothing is added to the repository or
-   its remote. Removing the repository from GitFolio takes them out.
+ - Installs a git hook (pre-push) in the repositories you choose,
+   on this computer only: nothing is added to the repository or its
+   remote. Removing the repository from GitFolio takes it out.
  - Keeps the collected commit information on this computer: %s
  - Automatic sync sends the past commits of the chosen repositories right
    away, then after every git push. Local mode sends nothing on its
@@ -296,7 +296,7 @@ var appMessages = map[string]map[string]string{
 		"ko": ` [GitFolio를 시작하면 하는 일]
  - aline.team에 로그인합니다. 계정이 없는 이메일이면 새 계정을 만듭니다
    (이용약관·개인정보처리방침 동의).
- - 고른 저장소에 git 훅(post-commit·pre-push)을 이 컴퓨터에만 설치합니다.
+ - 고른 저장소에 git 훅(pre-push)을 이 컴퓨터에만 설치합니다.
    저장소와 원격 저장소에는 아무것도 추가되지 않으며, GitFolio에서 저장소를
    빼면 되돌립니다.
  - 수집한 커밋 정보를 이 컴퓨터에 저장합니다: %s
@@ -312,7 +312,7 @@ var appMessages = map[string]map[string]string{
 		"ja": ` [GitFolio を始めると行うこと]
  - aline.team にログインします。アカウントのないメールアドレスなら
    新しいアカウントを作ります(利用規約・プライバシーポリシーに同意)。
- - 選んだリポジトリに git フック(post-commit・pre-push)をこのコンピュータに
+ - 選んだリポジトリに git フック(pre-push)をこのコンピュータに
    だけインストールします。リポジトリやリモートには何も追加されず、
    GitFolio からリポジトリを外すと元に戻ります。
  - 収集したコミット情報をこのコンピュータに保存します: %s
@@ -600,9 +600,9 @@ var messages = map[string]map[string]string{
 		"ja": "何も設定していません。準備ができたら `gitfolio init` を再実行してください。\n",
 	},
 	"hooksNotice": {
-		"en": "GitFolio adds git hooks (post-commit, pre-push) to the chosen repositories, on this computer only:\nnothing is added to the repository or its remote. `gitfolio remove` takes them out.\n",
-		"ko": "고른 저장소에 git 훅(post-commit·pre-push)을 이 컴퓨터에만 추가합니다.\n저장소와 원격 저장소에는 아무것도 추가되지 않으며, `gitfolio remove`로 되돌립니다.\n",
-		"ja": "選んだリポジトリに git フック(post-commit・pre-push)をこのコンピュータにだけ追加します。\nリポジトリやリモートには何も追加されず、`gitfolio remove` で元に戻ります。\n",
+		"en": "GitFolio adds a git hook (pre-push) to the chosen repositories, on this computer only:\nnothing is added to the repository or its remote. `gitfolio remove` takes it out.\n",
+		"ko": "고른 저장소에 git 훅(pre-push)을 이 컴퓨터에만 추가합니다.\n저장소와 원격 저장소에는 아무것도 추가되지 않으며, `gitfolio remove`로 되돌립니다.\n",
+		"ja": "選んだリポジトリに git フック(pre-push)をこのコンピュータにだけ追加します。\nリポジトリやリモートには何も追加されず、`gitfolio remove` で元に戻ります。\n",
 	},
 	"aiNameAsk": {
 		"en": "How should AI coding tools (Claude Code, Codex: gitfolio mcp) see the chosen repositories?\n1) by their real names  2) anonymous (\"Repository 1\")  3) not at all\nSet each repository later with `gitfolio config ai`.",
@@ -623,9 +623,9 @@ var messages = map[string]map[string]string{
 		"en": ` [What starting GitFolio does]
  - Logs in to aline.team; an email without an account gets a new one
    (agreeing to the terms of service and the privacy policy).
- - Installs git hooks (post-commit, pre-push) in the repositories you
-   choose, on this computer only: nothing is added to the repository or
-   its remote. gitfolio remove takes them out.
+ - Installs a git hook (pre-push) in the repositories you choose,
+   on this computer only: nothing is added to the repository or its
+   remote. gitfolio remove takes it out.
  - Keeps the collected commit information on this computer: %s
  - Automatic sync sends the past commits of the chosen repositories right
    away, then after every git push. Local mode sends nothing on its
@@ -640,7 +640,7 @@ var messages = map[string]map[string]string{
 		"ko": ` [GitFolio를 시작하면 하는 일]
  - aline.team에 로그인합니다. 계정이 없는 이메일이면 새 계정을 만듭니다
    (이용약관·개인정보처리방침 동의).
- - 고른 저장소에 git 훅(post-commit·pre-push)을 이 컴퓨터에만 설치합니다.
+ - 고른 저장소에 git 훅(pre-push)을 이 컴퓨터에만 설치합니다.
    저장소와 원격 저장소에는 아무것도 추가되지 않으며, gitfolio remove로
    되돌립니다.
  - 수집한 커밋 정보를 이 컴퓨터에 저장합니다: %s
@@ -656,7 +656,7 @@ var messages = map[string]map[string]string{
 		"ja": ` [GitFolio を始めると行うこと]
  - aline.team にログインします。アカウントのないメールアドレスなら
    新しいアカウントを作ります(利用規約・プライバシーポリシーに同意)。
- - 選んだリポジトリに git フック(post-commit・pre-push)をこのコンピュータに
+ - 選んだリポジトリに git フック(pre-push)をこのコンピュータに
    だけインストールします。リポジトリやリモートには何も追加されず、
    gitfolio remove で元に戻ります。
  - 収集したコミット情報をこのコンピュータに保存します: %s
@@ -1143,9 +1143,9 @@ var messages = map[string]map[string]string{
 		"ja": "別の gitfolio の処理が実行中です。しばらくしてから再試行してください。\n",
 	},
 	"hooksElsewhere": {
-		"en": "Hooks live outside .git (%s, e.g. a shared core.hooksPath or husky 5–8), so they were not changed.\nAdd these lines yourself:\n  pre-push:    gitfolio hook pre-push \"$PPID\"\n  post-commit: gitfolio hook post-commit\n",
-		"ko": "훅 폴더가 .git 밖에 있어(%s, 예: 공유 core.hooksPath·husky 5–8) 훅을 바꾸지 않았습니다.\n아래 줄을 직접 추가하세요:\n  pre-push:    gitfolio hook pre-push \"$PPID\"\n  post-commit: gitfolio hook post-commit\n",
-		"ja": "フックが .git の外にあるため(%s、例: 共有の core.hooksPath・husky 5–8)、変更していません。\n次の行をご自身で追加してください:\n  pre-push:    gitfolio hook pre-push \"$PPID\"\n  post-commit: gitfolio hook post-commit\n",
+		"en": "Hooks live outside .git (%s, e.g. a shared core.hooksPath or husky 5–8), so they were not changed.\nAdd this line yourself:\n  pre-push: gitfolio hook pre-push \"$PPID\"\n",
+		"ko": "훅 폴더가 .git 밖에 있어(%s, 예: 공유 core.hooksPath·husky 5–8) 훅을 바꾸지 않았습니다.\n아래 줄을 직접 추가하세요:\n  pre-push: gitfolio hook pre-push \"$PPID\"\n",
+		"ja": "フックが .git の外にあるため(%s、例: 共有の core.hooksPath・husky 5–8)、変更していません。\n次の行をご自身で追加してください:\n  pre-push: gitfolio hook pre-push \"$PPID\"\n",
 	},
 	"updateAsk": {
 		"en": "GitFolio %s is available (you have %s). Update now?",

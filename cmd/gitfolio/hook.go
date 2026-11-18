@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -29,12 +30,6 @@ done
 // A hook that existed before is renamed to <name>.gitfolio-orig and still runs first;
 // for pre-push its exit code is honored, so it can still block a push.
 var hookScripts = map[string]string{
-	"post-commit": "#!/bin/sh\n" + hookMarker + ` (github.com/Alineteam-Inc/GitFolio-CLI): notes AI agent use for this commit
-d=$(dirname "$0")
-[ -x "$d/post-commit.gitfolio-orig" ] && "$d/post-commit.gitfolio-orig" "$@"
-` + hookFind + `[ -n "$g" ] && "$g" hook post-commit >/dev/null 2>&1
-exit 0
-`,
 	"pre-push": "#!/bin/sh\n" + hookMarker + ` (github.com/Alineteam-Inc/GitFolio-CLI): collects pushed commits in the background
 d=$(dirname "$0")
 in=$(cat)
@@ -45,6 +40,11 @@ fi
 exit 0
 `,
 }
+
+// retiredHooks are hooks an earlier GitFolio installed and this one takes out: post-commit noted the AI
+// agent whose environment made a commit, which tells help with the message from help with the code no
+// more than the commit message does when it says so (GitFolio 0.8).
+var retiredHooks = []string{"post-commit"}
 
 // hooksDir returns the directory git runs repo's hooks from, and whether it is husky's: husky 9 sets
 // core.hooksPath to .husky/_, a folder it generates on this computer and keeps out of git. Other
@@ -75,11 +75,12 @@ func hooksDir(repo string) (dir string, husky bool, err error) {
 	return hooks, false, nil
 }
 
-// huskyHooks puts gitfolio's lines at the top of husky's generated pre-push and post-commit files, or
-// takes them out. They go first because husky's own line ends the script. husky writes these files
-// again on npm install, so scans put the lines back.
+// huskyHooks puts gitfolio's lines at the top of husky's generated pre-push file, or takes them out, and
+// takes them out of a retired hook's file. They go first because husky's own line ends the script.
+// husky writes these files again on npm install, so scans put the lines back.
 func huskyHooks(dir string, install bool) error {
-	for name, cmd := range map[string]string{"pre-push": `hook pre-push "$PPID"`, "post-commit": "hook post-commit"} {
+	for name, cmd := range map[string]string{"pre-push": `hook pre-push "$PPID"`, "post-commit": ""} { // "": retired
+		install := install && cmd != ""
 		p := filepath.Join(dir, name)
 		b, err := os.ReadFile(p)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -135,7 +136,7 @@ func installHooks(repo string) error {
 			return err
 		}
 	}
-	return nil
+	return takeOutHooks(dir, retiredHooks)
 }
 
 // uninstallHooks removes gitfolio's hooks and puts back the ones that were there before.
@@ -147,7 +148,12 @@ func uninstallHooks(repo string) error {
 	if husky {
 		return huskyHooks(dir, false)
 	}
-	for name := range hookScripts {
+	return takeOutHooks(dir, append(slices.Collect(maps.Keys(hookScripts)), retiredHooks...))
+}
+
+// takeOutHooks removes gitfolio's hooks of these names from dir and puts back the ones that were there before.
+func takeOutHooks(dir string, names []string) error {
+	for _, name := range names {
 		p := filepath.Join(dir, name)
 		if b, err := os.ReadFile(p); err != nil || !strings.Contains(string(b), hookMarker) {
 			continue
@@ -179,19 +185,11 @@ func hookStatus(repo string) string {
 // cmdHook runs inside git hooks. Hooks ignore its exit code, so errors only matter for debugging.
 func cmdHook(dir string, args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: gitfolio hook post-commit|pre-push")
+		return errors.New("usage: gitfolio hook pre-push")
 	}
 	switch args[0] {
 	case "post-commit":
-		agents := agentsFromEnv(os.Getenv)
-		if len(agents) == 0 {
-			return nil
-		}
-		out, err := git(".", "rev-parse", "HEAD")
-		if err != nil {
-			return err
-		}
-		return appendAgentTag(dir, agentTag{Hash: strings.TrimSpace(out), Agents: agents})
+		return nil // a retired hook not taken out yet (retiredHooks): the next scan does
 	case "pre-push":
 		// git waits for this hook, so the work runs in a separate process that outlives it.
 		exe, err := os.Executable()

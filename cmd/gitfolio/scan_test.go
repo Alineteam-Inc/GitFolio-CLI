@@ -464,7 +464,7 @@ func TestLaterSettingsKept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	readRepo(Config{Emails: []string{"dev@example.com"}}, nil, storedNow{}, &repos[0], false)
+	readRepo(Config{Emails: []string{"dev@example.com"}}, storedNow{}, &repos[0], false)
 	if err := saveRepos(dir, repos); err != nil {
 		t.Fatal(err)
 	}

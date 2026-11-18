@@ -45,8 +45,8 @@ commands:
                         verified email is the account (--signup: sign it up if it has none)
   logout [--json]       sign out: revoke and remove this device's token
   whoami [--json]       show the aline.team account this device is signed in to
-  add [path] [--json]   register a repository, collect its commits and install git hooks
-                        (post-commit, pre-push) so later pushes are collected automatically
+  add [path] [--json]   register a repository, collect its commits and install a git hook
+                        (pre-push) so later pushes are collected automatically
   remove [path] [--purge] [--json]
                         unregister a repository and restore its previous hooks
                         (--purge: also delete its collected commits, here and on aline.team)

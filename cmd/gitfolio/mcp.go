@@ -271,9 +271,8 @@ var mcpSetupTools = []mcpTool{
 		Name:  "add_repository",
 		Title: "Register a repository",
 		Description: "Register a git repository on this computer with GitFolio: collects the user's own pushed commits and " +
-			"installs git hooks (post-commit, pre-push) that note the AI tools used at commit time and collect each push. " +
-			"The hooks stay in this computer's .git folder: nothing is added to the repository or its remote. Only " +
-			"repositories the user chose; tell them about the hooks first. Afterwards agree with them how it appears to " +
+			"installs a git hook (pre-push) that collects each push. The hook stays in this computer's .git folder: " +
+			"nothing is added to the repository or its remote. Only repositories the user chose; tell them about the hook first. Afterwards agree with them how it appears to " +
 			"AI tools (set_ai_exposure).",
 		InputSchema: object(map[string]any{
 			"path": prop("string", "A path in the repository. Empty: the current folder."),
@@ -1018,7 +1017,7 @@ func mcpAddRepository(dir string, args map[string]any) (any, error) {
 	if err := withLock(dir, func() error { n, err = registerRepo(dir, newRepo(top), true); return err }); err != nil {
 		return nil, err
 	}
-	hooks := "post-commit and pre-push; hooks it already had still run first, and gitfolio remove puts them back"
+	hooks := "pre-push; a hook it already had still runs first, and gitfolio remove puts it back"
 	return map[string]any{"repository": filepath.Base(top), "commitsCollected": n, "hooksInstalled": hooks,
 		"next": "Agree with the user how this repository appears to AI tools (set_ai_exposure): by its real name (default), " +
 			"anonymous or another name; its commit messages and branch names stay hidden unless they allow them. " +

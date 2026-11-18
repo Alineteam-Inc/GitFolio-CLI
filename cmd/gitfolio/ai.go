@@ -127,44 +127,6 @@ func tailLines(s string, maxLines int) string {
 	return strings.Join(lines[start:], "\n")
 }
 
-// agentEnv maps environment variables that AI agents set on the commands they run (DESIGN 5.3).
-// Git passes them on to hooks, so post-commit sees them even when the commit has no trailer.
-var agentEnv = map[string]string{
-	"CLAUDECODE":       "claude-code",
-	"CODEX_CI":         "codex",
-	"CODEX_THREAD_ID":  "codex",
-	"CURSOR_AGENT":     "cursor",
-	"COPILOT_AGENT":    "copilot",
-	"COPILOT_CLI":      "copilot",
-	"GEMINI_CLI":       "gemini",
-	"OPENCODE":         "opencode",
-	"CLINE_ACTIVE":     "cline",
-	"ROO_ACTIVE":       "roo-code",
-	"AGENT_SESSION_ID": "goose",
-}
-
-// agentsFromEnv returns the AI agents whose environment variables are set.
-func agentsFromEnv(getenv func(string) string) []string {
-	var agents []string
-	for k, a := range agentEnv {
-		if v := getenv(k); v != "" && v != "0" && v != "false" {
-			agents = append(agents, a)
-		}
-	}
-	// Cross-vendor conventions: AI_AGENT ("claude-code_2-1-283_agent", "devin@1") and AGENT ("amp").
-	for _, k := range []string{"AI_AGENT", "AGENT"} {
-		v := strings.ToLower(strings.TrimSpace(getenv(k)))
-		if i := strings.IndexAny(v, "_@"); i >= 0 {
-			v = v[:i]
-		}
-		if v != "" && v != "1" && v != "true" {
-			agents = append(agents, v)
-		}
-	}
-	slices.Sort(agents)
-	return slices.Compact(agents)
-}
-
 // coAuthorEmails returns the lowercased emails of the message's Co-authored-by trailers.
 func coAuthorEmails(message string) []string {
 	var emails []string

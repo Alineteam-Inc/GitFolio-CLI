@@ -5,25 +5,6 @@ import (
 	"testing"
 )
 
-func TestAgentsFromEnv(t *testing.T) {
-	for _, tc := range []struct {
-		env  map[string]string
-		want string
-	}{
-		{map[string]string{}, ""},
-		{map[string]string{"CLAUDECODE": "1", "AI_AGENT": "claude-code_2-1-283_agent"}, "claude-code"},
-		{map[string]string{"CODEX_CI": "1"}, "codex"},
-		{map[string]string{"AGENT": "amp"}, "amp"},
-		{map[string]string{"OPENCODE": "1", "AGENT": "1"}, "opencode"},
-		{map[string]string{"ROO_ACTIVE": "false", "CLAUDECODE": ""}, ""},
-	} {
-		got := strings.Join(agentsFromEnv(func(k string) string { return tc.env[k] }), ",")
-		if got != tc.want {
-			t.Errorf("agentsFromEnv(%v) = %q, want %q", tc.env, got, tc.want)
-		}
-	}
-}
-
 func TestDetectAgents(t *testing.T) {
 	for _, tc := range []struct{ name, email, msg, want string }{
 		{"me", "me@x.com", "fix bug", ""},

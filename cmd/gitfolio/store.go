@@ -254,24 +254,6 @@ func encodeJSONL[T any](p string, flag int, items []T) error {
 	return f.Close()
 }
 
-// agentTag is what the post-commit hook records when an AI agent's environment made the commit.
-type agentTag struct {
-	Hash   string   `json:"hash"`
-	Agents []string `json:"agents"`
-}
-
-func appendAgentTag(dir string, t agentTag) error {
-	return encodeJSONL(filepath.Join(dir, "agent-tags.jsonl"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, []agentTag{t})
-}
-
-// readAgentTags returns the recorded agents by commit hash.
-// ponytail: the file only grows; prune tags of stored commits if it ever gets large.
-func readAgentTags(dir string) (map[string][]string, error) {
-	tags := map[string][]string{}
-	err := decodeJSONL(filepath.Join(dir, "agent-tags.jsonl"), func(t agentTag) { tags[t.Hash] = append(tags[t.Hash], t.Agents...) })
-	return tags, err
-}
-
 // scanRepo stores the user's commits in r that are not stored yet and returns how many were added.
 // With rebuild, r's stored commits are dropped first and collected again. Callers hold the data lock.
 // ponytail: each scan lists every commit in range (no files) to find what is new; a repository whose
@@ -302,11 +284,8 @@ func scanRepos(dir string, rs []*Repo, rebuild bool, each func(i, added int, err
 			return err
 		}
 	}
-	tags, err := readAgentTags(dir)
-	if err != nil {
-		return err
-	}
-	stored, err := readCommits(dir) // for readRepo to tell whether a repository has anything to store
+	_ = os.Remove(filepath.Join(dir, "agent-tags.jsonl")) // the retired post-commit hook's notes (retiredHooks)
+	stored, err := readCommits(dir)                       // for readRepo to tell whether a repository has anything to store
 	if err != nil {
 		return err
 	}
@@ -337,7 +316,7 @@ func scanRepos(dir string, rs []*Repo, rebuild bool, each func(i, added int, err
 	for i := range reads {
 		reads[i] = make(chan repoRead, 1)
 	}
-	go sideBySide(len(rs), func(i int) { reads[i] <- readRepo(cfg, tags, had, rs[i], rebuild) })
+	go sideBySide(len(rs), func(i int) { reads[i] <- readRepo(cfg, had, rs[i], rebuild) })
 	// The reads run on while the first repositories are stored: storing adds to a copy of what is known.
 	storing := storedNow{known: maps.Clone(had.known), noBranch: had.noBranch}
 	for i, r := range rs {
@@ -378,12 +357,14 @@ type repoRead struct {
 }
 
 // readRepo reads r's git for a scan and sets what it counts of the whole history on r.
-func readRepo(cfg Config, tags map[string][]string, had storedNow, r *Repo, rebuild bool) (g repoRead) {
+func readRepo(cfg Config, had storedNow, r *Repo, rebuild bool) (g repoRead) {
 	if g.mine, g.err = myEmails(r.Path, cfg.Emails); g.err != nil {
 		return g
 	}
 	if hooks, husky, err := hooksDir(r.Path); err == nil && husky {
 		_ = huskyHooks(hooks, true) // husky rewrites its hook files on npm install; put gitfolio's lines back
+	} else if err == nil {
+		_ = takeOutHooks(hooks, retiredHooks) // put in by an earlier GitFolio
 	}
 	r.Name = filepath.Base(r.Path)
 	was := deletion{r.Provider, r.Namespace}
@@ -399,12 +380,12 @@ func readRepo(cfg Config, tags map[string][]string, had storedNow, r *Repo, rebu
 		return g
 	}
 	// Every commit in range, without its files: what is new, and whether the history counts the same.
-	if g.all, g.err = readCommitsOf(r.Path, g.rng, false, tags); g.err != nil {
+	if g.all, g.err = readCommitsOf(r.Path, g.rng, false); g.err != nil {
 		return g
 	}
 	key := []any{g.rng, slices.Sorted(maps.Keys(g.mine)), version}
 	for _, c := range g.all {
-		key = append(key, c.Hash, c.AIAgents) // the agents also come from agent tags
+		key = append(key, c.Hash, c.AIAgents)
 		g.need = g.need || !had.known[c.Hash] && creationType(c, g.mine) != ""
 	}
 	g.seen = fingerprint(key)
@@ -412,7 +393,7 @@ func readRepo(cfg Config, tags map[string][]string, had storedNow, r *Repo, rebu
 	g.need = g.need || old || g.rng[0] == "--remotes" && had.noBranch[r.ID]
 	// The files of everyone's commits, the slow part, only when the commits or the rules changed.
 	if old || g.seen != r.Seen {
-		all, err := readCommitsOf(r.Path, g.rng, true, tags)
+		all, err := readCommitsOf(r.Path, g.rng, true)
 		if err != nil {
 			g.err = err
 			return g
@@ -426,19 +407,13 @@ func readRepo(cfg Config, tags map[string][]string, had storedNow, r *Repo, rebu
 	return g
 }
 
-// readCommitsOf parses gitLog of rng, the agents of agent tags added.
-func readCommitsOf(repo string, rng []string, files bool, tags map[string][]string) ([]Commit, error) {
+// readCommitsOf parses gitLog of rng.
+func readCommitsOf(repo string, rng []string, files bool) ([]Commit, error) {
 	out, err := gitLog(repo, rng, files)
 	if err != nil {
 		return nil, err
 	}
-	all := parseLog(out)
-	for i, c := range all {
-		if extra := tags[c.Hash]; len(extra) > 0 {
-			all[i].AIAgents = slices.Compact(slices.Sorted(slices.Values(append(c.AIAgents, extra...))))
-		}
-	}
-	return all, nil
+	return parseLog(out), nil
 }
 
 // storeScan stores the user's commits that readRepo found and are not stored yet.

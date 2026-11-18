@@ -50,11 +50,6 @@ func hooksEndToEnd(t *testing.T, bin string, husky bool) {
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	for k := range agentEnv { // the test itself may run inside an AI agent
-		t.Setenv(k, "")
-	}
-	t.Setenv("AI_AGENT", "")
-	t.Setenv("AGENT", "")
 	f := &fakeAline{token: testToken}
 	srv := httptest.NewServer(f.handler())
 	defer srv.Close()
@@ -101,6 +96,16 @@ func hooksEndToEnd(t *testing.T, bin string, husky bool) {
 	}
 	write(orig, origScript)
 	ran := filepath.Join(filepath.Dir(orig), "orig-ran")
+	// The post-commit hook of an earlier GitFolio, which add takes out (retiredHooks).
+	retired, retiredWant := filepath.Join(hooks, "post-commit"), "#!/bin/sh\necho own\n"
+	if husky {
+		first, rest, _ := strings.Cut(huskyStub, "\n")
+		retiredWant = huskyStub
+		write(retired, first+"\n"+hookMarker+" (github.com/Alineteam-Inc/GitFolio-CLI)\n:\n"+hookMarker+" end\n"+rest)
+	} else {
+		write(retired+".gitfolio-orig", retiredWant)
+		write(retired, "#!/bin/sh\n"+hookMarker+"\n")
+	}
 	if err := os.WriteFile(filepath.Join(repo, "a.txt"), []byte("a\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -122,6 +127,9 @@ func hooksEndToEnd(t *testing.T, bin string, husky bool) {
 	if b, _ := os.ReadFile(filepath.Join(hooks, "pre-push")); !strings.Contains(string(b), hookMarker) {
 		t.Fatal("pre-push hook not installed")
 	}
+	if b, _ := os.ReadFile(retired); string(b) != retiredWant {
+		t.Errorf("the retired post-commit hook is still there:\n%s", b)
+	}
 	if husky { // npm install makes husky write its files again; the next scan puts gitfolio's lines back
 		write(filepath.Join(hooks, "pre-push"), huskyStub)
 		run(nil, repo, "gitfolio", "scan", ".")
@@ -131,7 +139,8 @@ func hooksEndToEnd(t *testing.T, bin string, husky bool) {
 	}
 	os.Remove(ran)
 
-	// A commit made from an AI agent's shell: no trailer, only the agent's environment variable.
+	// A commit made from an AI agent's shell with no trailer: the environment alone tells help with the
+	// message from help with the code no more than a trailer saying so does, so it is the user's own.
 	if err := os.WriteFile(filepath.Join(repo, "b.txt"), []byte("b\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -154,8 +163,8 @@ func hooksEndToEnd(t *testing.T, bin string, husky bool) {
 	if got == nil {
 		t.Fatal("pushed commit was not collected by the pre-push hook")
 	}
-	if got.CreationType != "HUMAN_CO_AI" || strings.Join(got.AIAgents, ",") != "claude-code" {
-		t.Errorf("agent change = %s %v, want HUMAN_CO_AI [claude-code]", got.CreationType, got.AIAgents)
+	if got.CreationType != "HUMAN" || len(got.AIAgents) > 0 {
+		t.Errorf("agent change = %s %v, want HUMAN and no agents", got.CreationType, got.AIAgents)
 	}
 	sent := 0 // both commits: the one collected by add and the pushed one
 	for deadline := time.Now().Add(15 * time.Second); sent < 2 && time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
@@ -184,8 +193,8 @@ func hooksEndToEnd(t *testing.T, bin string, husky bool) {
 	if strings.Contains(string(b), hookMarker) || !strings.Contains(string(b), "orig-ran") {
 		t.Errorf("remove did not restore the original pre-push hook:\n%s", b)
 	}
-	if _, err := os.Stat(filepath.Join(hooks, "post-commit")); err == nil {
-		t.Error("post-commit hook left behind after remove")
+	if b, _ := os.ReadFile(retired); strings.Contains(string(b), hookMarker) {
+		t.Errorf("gitfolio's post-commit hook is there after remove:\n%s", b)
 	}
 }
 
@@ -196,7 +205,6 @@ func TestLoginGate(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	t.Setenv("AppData", filepath.Join(home, "AppData")) // the data folder on Windows
-	t.Setenv("CLAUDECODE", "1")                         // post-commit would record this tag if it ran
 	t.Chdir(t.TempDir())                                // not a git repository: a hook that ran would fail
 	if err := run([]string{"scan"}); err == nil || !strings.Contains(err.Error(), "gitfolio login") {
 		t.Errorf("scan before login: %v, want a login hint", err)
