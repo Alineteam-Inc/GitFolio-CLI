@@ -306,11 +306,12 @@ func initScan(dir string, args []string) error {
 		LastCommit string `json:"lastCommit,omitempty"` // of the user's own commits
 		Registered bool   `json:"registered"`
 	}
-	repos := []repo{}
-	for _, p := range found {
+	repos := make([]repo, len(found))
+	sideBySide(len(found), func(i int) {
+		p := found[i]
 		n, last := ownCommits(p, work)
-		repos = append(repos, repo{filepath.Base(p), p, n, last, slices.ContainsFunc(registered, func(r Repo) bool { return r.Path == p })})
-	}
+		repos[i] = repo{filepath.Base(p), p, n, last, slices.ContainsFunc(registered, func(r Repo) bool { return r.Path == p })}
+	})
 	list := []map[string]any{}
 	for _, e := range append(slices.Clone(cfg.Emails), emails...) {
 		if slices.ContainsFunc(list, func(m map[string]any) bool { return m["email"] == e }) {
@@ -410,12 +411,14 @@ func chooseRepos(lang, dir string, found, work []string) ([]string, error) {
 		path, last string
 		commits    int
 	}
-	var cands []candidate
-	for _, p := range found {
-		if n, last := ownCommits(p, work); n > 0 && !registered[p] {
-			cands = append(cands, candidate{p, last, n})
+	all := make([]candidate, len(found))
+	sideBySide(len(found), func(i int) { // reading each repository's history is most of the wait
+		if !registered[found[i]] {
+			n, last := ownCommits(found[i], work)
+			all[i] = candidate{found[i], last, n}
 		}
-	}
+	})
+	cands := slices.DeleteFunc(all, func(c candidate) bool { return c.commits == 0 })
 	if len(cands) == 0 {
 		say(lang, "noCandidates")
 		return nil, nil
