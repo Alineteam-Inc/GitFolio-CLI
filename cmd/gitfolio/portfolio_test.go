@@ -230,3 +230,29 @@ func TestPortfolioWithoutAnotherAccountsType(t *testing.T) {
 		t.Errorf("portfolio with aline.team down: %v, missing %v\n%s", err, missing, md)
 	}
 }
+
+// Ctrl-C while the browser prints stops it, not GitFolio: the folder with the page and the browser's
+// profile is removed all the same.
+func TestPrintPDFInterrupted(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the stand-in browser is a shell script")
+	}
+	work := t.TempDir()
+	browser := filepath.Join(t.TempDir(), "chrome")
+	if err := os.WriteFile(browser, []byte("#!/bin/sh\nsleep 5\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CHROME_PATH", browser)
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		p, _ := os.FindProcess(os.Getpid())
+		p.Signal(os.Interrupt)
+	}()
+	start := time.Now()
+	if err := printPDF("<p>x</p>", filepath.Join(work, "cv.pdf")); err == nil || time.Since(start) > 4*time.Second {
+		t.Errorf("printPDF after Ctrl-C: %v after %v", err, time.Since(start))
+	}
+	if left, _ := filepath.Glob(filepath.Join(work, "gitfolio-portfolio-*")); len(left) > 0 {
+		t.Errorf("left behind: %v", left)
+	}
+}

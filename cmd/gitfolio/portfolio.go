@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -477,7 +478,10 @@ func printPDF(page, out string) error {
 	if err := os.WriteFile(src, []byte(page), 0o600); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	// Ctrl-C stops the browser rather than GitFolio, so the folder above still goes.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	args := []string{"--headless", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
 		"--user-data-dir=" + filepath.Join(tmp, "profile"), "--no-pdf-header-footer", "--print-to-pdf-no-header",
@@ -486,6 +490,7 @@ func printPDF(page, out string) error {
 		args = append([]string{"--no-sandbox"}, args...)
 	}
 	cmd := exec.CommandContext(ctx, browser, args...)
+	cmd.WaitDelay = time.Second // once it is stopped, its own processes may still hold the output open
 	output, runErr := cmd.CombinedOutput()
 	if fi, err := os.Stat(pdf); err != nil || fi.Size() == 0 {
 		return failure("portfolioPDFFailed", filepath.Base(browser), cmp.Or(lastLine(string(output)), fmt.Sprint(runErr)))
