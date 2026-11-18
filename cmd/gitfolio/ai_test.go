@@ -52,6 +52,13 @@ func TestDetectAgents(t *testing.T) {
 		{"me", "me@x.com", "feat\n\nmade with precursor tools", ""},
 		{"me", "me@x.com", "feat\n\nGenerated with Claude and reviewed by me", "claude-code"},
 		{"me", "me@x.com", "feat\n\nCo-authored-by: Gemini Code Assist <gemini@example.com>", "gemini"},
+		// Only claude and devin are also people's names: with another tool's name it is the tool.
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Codex Worker", "codex"},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Codex Worker <[EMAIL]>", "codex"},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Copilot Reviewer <rev@corp.com>", "copilot"},
+		{"me", "me@x.com", "feat\n\nWritten by Cursor Team", "cursor"},
+		{"me", "me@x.com", "feat\n\nAssisted-by: Opencode Zen", "opencode"},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Jean Claude Van Damme <jcvd@corp.com>", ""},
 	} {
 		if got := strings.Join(detectAgents(tc.name, tc.email, tc.msg), ","); got != tc.want {
 			t.Errorf("detectAgents(%q, %q, %q) = %q, want %q", tc.name, tc.email, tc.msg, got, tc.want)

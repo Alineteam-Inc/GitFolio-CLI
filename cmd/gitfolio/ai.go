@@ -126,7 +126,7 @@ func detectAgents(authorName, authorEmail, message string) []string {
 
 // vendorsOf is the AI tools a co-author's name and email, or a footer's phrase, name: from an agent's
 // address, those its name and address name; otherwise those its name names, unless it may be a person's
-// name and looks like one.
+// name, names only claude or devin, and looks like one.
 func vendorsOf(name, email string, mayBePerson bool) []string {
 	words := wordsOf(name)
 	found := vendorsIn(words)
@@ -138,7 +138,9 @@ func vendorsOf(name, email string, mayBePerson bool) []string {
 		}
 		return found
 	}
-	if len(found) == 0 || mayBePerson && looksLikePerson(name, words) {
+	// Only claude and devin are also people's names: with another tool's name it is the tool ("Codex Worker").
+	personal := !slices.ContainsFunc(found, func(a string) bool { return a != "claude-code" && a != "devin" })
+	if len(found) == 0 || mayBePerson && personal && looksLikePerson(name, words) {
 		return nil
 	}
 	return found
