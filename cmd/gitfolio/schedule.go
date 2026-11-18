@@ -425,6 +425,9 @@ func cronSchedule(exe, logFile string, h, m int) error {
 	current, err := exec.Command("crontab", "-l").Output()
 	var ee *exec.ExitError
 	if err != nil && !(errors.As(err, &ee) && strings.Contains(string(ee.Stderr), "no crontab")) {
+		if h < 0 { // only removing: GitFolio writes a crontab only after reading it, so none of its lines is there
+			return nil
+		}
 		return fmt.Errorf("crontab -l: %v", err) // never rewrite a crontab that could not be read
 	}
 	line := ""

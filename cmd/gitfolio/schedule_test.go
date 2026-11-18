@@ -180,3 +180,22 @@ func TestScheduleRunsThisCopy(t *testing.T) {
 		t.Errorf("an empty XDG_CONFIG_HOME was passed on: %v", env)
 	}
 }
+
+// A crontab that cannot be read (the user may not use cron) is never rewritten; removing GitFolio's line
+// from it is not an error, so schedule on Linux works with the systemd timer.
+func TestCronUnreadable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the stand-in crontab is a shell script")
+	}
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "crontab"), []byte("#!/bin/sh\necho 'You are not allowed to use this program' >&2\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	if err := cronSchedule("", "", -1, -1); err != nil {
+		t.Errorf("removing: %v", err)
+	}
+	if err := cronSchedule("/bin/gitfolio", "/tmp/log", 9, 5); err == nil {
+		t.Error("adding to an unreadable crontab did not fail")
+	}
+}
