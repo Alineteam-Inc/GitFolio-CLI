@@ -73,9 +73,11 @@ type Commit struct {
 	coAuthors    []string   // raw Co-authored-by emails, used for matching only, never stored
 }
 
-// repoFormat is the version of the stored commits: 3 also records which files a commit created, 2 file
-// paths in the repository, 1 only file names.
-const repoFormat = 3
+// repoFormat is the version of the stored commits: 4 reads AI use from the message as aline.team does
+// (help with the message alone is not help with the code), 3 also records which files a commit created,
+// 2 file paths in the repository, 1 only file names. A scan collects older ones again from git, and a
+// sync sends again those that changed.
+const repoFormat = 4
 
 func dataDir() (string, error) {
 	dir, err := dataPath()

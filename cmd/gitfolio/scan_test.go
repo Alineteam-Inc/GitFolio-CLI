@@ -546,3 +546,36 @@ func TestTornCommitLineSkipped(t *testing.T) {
 		t.Errorf("read with a torn last line: %+v, %v", commits, err)
 	}
 }
+
+// A commit stored as made with AI because only its message was written with AI is read again once from
+// git when the stored format is older, and becomes the user's own; a sync then sends it again.
+func TestMessageOnlyAIReadAgain(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	repo, data := t.TempDir(), t.TempDir()
+	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"config", "user.email", "me@example.com"}, {"config", "user.name", "me"},
+		{"commit", "-q", "--allow-empty", "-m", "feat: pay\n\nCommit-Message-Assisted-By: claude (via claude code)"}} {
+		if out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	r := newRepo(repo)
+	if _, err := scanRepo(data, &r, false); err != nil {
+		t.Fatal(err)
+	}
+	commits, _ := readCommits(data)
+	if len(commits) != 1 || commits[0].CreationType != creationHuman || len(commits[0].AIAgents) > 0 {
+		t.Fatalf("collected %+v", commits)
+	}
+	commits[0].CreationType, commits[0].AIAgents = creationHumanCoAI, []string{"claude-code"} // as GitFolio 0.7 judged it
+	if err := writeCommits(data, commits); err != nil {
+		t.Fatal(err)
+	}
+	r.Format = 3
+	if _, err := scanRepo(data, &r, false); err != nil {
+		t.Fatal(err)
+	}
+	if commits, _ = readCommits(data); len(commits) != 1 || commits[0].CreationType != creationHuman || len(commits[0].AIAgents) > 0 {
+		t.Errorf("after the format change: %+v", commits)
+	}
+}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -30,17 +31,23 @@ var githubBots = map[string]string{
 	"amazon-q-developer":   "amazon-q",
 }
 
-var agentMarkers = map[string]string{
-	"generated with [claude code]": "claude-code",
-	"generated with [codex]":       "codex",
-	"made-with: cursor":            "cursor",
-	"amp-thread-id:":               "amp",
-}
+// AI use a commit message tells, read as aline.team reads it (its commit trailer parser), in the last
+// 20 non-blank lines: a Co-authored-by trailer naming an AI vendor, a footer whose verb (generated
+// with, assisted-by, written by, created with, made-with, ...) comes before one, or a session trailer
+// an agent leaves. A verb right after "message" ("Commit-Message-Assisted-By: ...") says only the message
+// was written with AI, not the code, and does not count.
+var (
+	coAuthorTrailer = regexp.MustCompile(`(?im)^Co-Authored-By:\s+(.+?)\s*<(.+?)>\s*$`)
+	aiFooter        = regexp.MustCompile(`(?i)(?:generated\s+with|assisted[-\s]by|co-?authored[-\s]by|written\s+by|created\s+(?:with|by)|made[-\s]with)[:\s]+\[?\s*([a-z0-9 ._\-]{0,30})`)
+	sessionTrailer  = regexp.MustCompile(`(?im)^\s*(claude-session|agent-logs-url)\s*:`)
+	vendorNoise     = regexp.MustCompile(`[\s._\-\[\]<>()]`)
+)
 
-// assistedNames maps words in an "Assisted-by:" trailer to agent ids.
-var assistedNames = map[string]string{
-	"claude": "claude-code", "codex": "codex", "copilot": "copilot", "cursor": "cursor",
-	"gemini": "gemini", "aider": "aider", "devin": "devin", "jules": "jules", "kiro": "kiro",
+// aiVendors maps the AI vendors aline.team looks for in those to GitFolio's agent IDs.
+var aiVendors = map[string]string{
+	"claude": "claude-code", "copilot": "copilot", "cursor": "cursor", "codex": "codex", "aider": "aider",
+	"codeium": "codeium", "gemini-code": "gemini", "chatgpt": "chatgpt", "devin": "devin", "sweep-ai": "sweep",
+	"opencode": "opencode", "ampcode": "amp",
 }
 
 func agentByEmail(email string) string {
@@ -70,26 +77,54 @@ func detectAgents(authorName, authorEmail, message string) []string {
 	if strings.HasSuffix(strings.ToLower(strings.TrimSpace(authorName)), "(aider)") {
 		add("aider")
 	}
-	for _, e := range coAuthorEmails(message) {
-		add(agentByEmail(e))
-	}
-	lower := strings.ToLower(message)
-	for _, line := range strings.Split(lower, "\n") {
-		if v, ok := strings.CutPrefix(strings.TrimSpace(line), "assisted-by:"); ok {
-			for word, a := range assistedNames {
-				if strings.Contains(v, word) {
-					add(a)
-				}
+	vendors := func(text string) {
+		text = vendorNoise.ReplaceAllString(strings.ToLower(text), "")
+		for v, a := range aiVendors {
+			if strings.Contains(text, vendorNoise.ReplaceAllString(v, "")) {
+				add(a)
 			}
 		}
 	}
-	for marker, a := range agentMarkers {
-		if strings.Contains(lower, marker) {
-			add(a)
+	tail := tailLines(message, 20)
+	for _, m := range coAuthorTrailer.FindAllStringSubmatch(tail, -1) {
+		vendors(m[1])
+		vendors(m[2])
+		add(agentByEmail(m[2])) // agents aline.team knows no vendor name for
+	}
+	for pos := 0; ; {
+		m := aiFooter.FindStringSubmatchIndex(tail[pos:])
+		if m == nil {
+			break
 		}
+		start, before := pos+m[0], tail[:pos+m[0]]
+		if n := len(before); n >= 8 && strings.ContainsRune("- \t\n\v\f\r", rune(before[n-1])) && strings.EqualFold(before[n-8:n-1], "message") {
+			pos = start + 1 // only the message was written with AI
+			continue
+		}
+		vendors(tail[pos+m[2] : pos+m[3]])
+		pos += m[1]
+	}
+	for _, m := range sessionTrailer.FindAllStringSubmatch(tail, -1) {
+		add(map[bool]string{true: "claude-code", false: "copilot"}[strings.EqualFold(m[1], "claude-session")])
 	}
 	slices.Sort(agents) // map iteration order is random; keep output stable
 	return agents
+}
+
+// tailLines is the end of s from its maxLines-th last non-blank line.
+func tailLines(s string, maxLines int) string {
+	lines := strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
+	start, n := 0, 0
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.TrimSpace(lines[i]) != "" {
+			n++
+		}
+		if n >= maxLines {
+			start = i
+			break
+		}
+	}
+	return strings.Join(lines[start:], "\n")
 }
 
 // agentEnv maps environment variables that AI agents set on the commands they run (DESIGN 5.3).
