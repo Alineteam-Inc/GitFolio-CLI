@@ -7,8 +7,10 @@ import (
 	"unicode"
 )
 
-// Agent signatures found in commit metadata (DESIGN 5.3): the authors and co-authors the agents write
-// themselves, as their docs, source code or commits show them. Add one line per new agent.
+// Agent signatures found in commit metadata (DESIGN 5.3): the authors the agents write themselves, as their
+// docs, source code or commits show them. Add one line per new agent. In a Co-authored-by line only the
+// wordTools' own addresses name a tool by themselves, as aline.team reads it; the others name it by the
+// name or the domain beside them, or not at all ("Droid <droid@factory.ai>").
 var agentEmails = map[string]string{
 	"noreply@anthropic.com":       "claude-code",
 	"noreply@openai.com":          "codex",
@@ -56,14 +58,14 @@ var agentAccounts = map[string]string{
 }
 
 // AI use a commit message tells, read as aline.team reads it (its commit trailer parser), in the last
-// 20 non-blank lines: a Co-authored-by line naming an AI tool, a footer whose verb (generated with,
+// 20 non-blank lines: a Co-authored-by line naming an AI tool, a footer whose verb (generated with or by,
 // assisted-by, written by, created with, made-with, ...) comes before one, or a session trailer an agent
 // leaves. A verb right after "message" ("Commit-Message-Assisted-By: ...") says only the message was
 // written with AI, not the code, and does not count. A tool is named by a word of its own ("Haider" is
 // not aider), and a person's name ("Devin Lee") counts only with an agent's address.
 var (
 	coAuthorLine   = regexp.MustCompile(`(?i)^\s*co-?authored[-\s]by\s*:?\s*(.*?)\s*(?:<([^<>]*)>)?\s*$`)
-	aiFooter       = regexp.MustCompile(`(?i)(generated\s+with|assisted[-\s]by|co-?authored[-\s]by|written\s+by|created\s+(?:with|by)|made[-\s]with)[:\s]+\[?\s*([a-z0-9 ._\-]{0,30})`)
+	aiFooter       = regexp.MustCompile(`(?i)(generated\s+(?:with|by)|assisted[-\s]by|co-?authored[-\s]by|written\s+by|created\s+(?:with|by)|made[-\s]with)[:\s]+\[?\s*([a-z0-9 ._\-]{0,30})`)
 	sessionTrailer = regexp.MustCompile(`(?im)^\s*(claude-session|agent-logs-url|amp-thread-id|copilot-session)\s*:|^\s*(replit)-commit-author\s*:\s*agent\s*$`)
 )
 
@@ -86,7 +88,7 @@ var aiVendors = []struct{ name, agent string }{
 var personalTools = []string{"claude-code", "devin", "letta-code", "cline"}
 
 // wordTools are the tools whose names are also everyday words ("to continue the migration"): one names
-// the tool only as the first word of a name or a footer's phrase, or by its exact email (agentEmails),
+// the tool only as the first word of a name or a footer's phrase, or by its own address (agentEmails),
 // never by an email's domain.
 var wordTools = []string{"warp", "crush", "continue"}
 
@@ -138,7 +140,6 @@ func detectAgents(authorName, authorEmail, message string) []string {
 			for _, a := range vendorsOf(m[1], m[2], true) {
 				add(a)
 			}
-			add(agentEmails[strings.ToLower(strings.TrimSpace(m[2]))]) // agents aline.team knows no tool name for (Warp)
 			line = ""
 		}
 		rest.WriteString(line + "\n")
@@ -181,6 +182,9 @@ func vendorsOf(name, email string, mayBePerson bool) []string {
 				found = append(found, a)
 			}
 		}
+		if a := wordToolEmail(email); a != "" && !slices.Contains(found, a) {
+			found = append(found, a)
+		}
 		return found
 	}
 	// Only a few tools' names are also people's (personalTools): with another tool's name it is the tool ("Codex Worker").
@@ -215,14 +219,22 @@ func vendorsIn(words []string) []string {
 	return found
 }
 
+// wordToolEmail is the wordTool whose own address email is ("Oz <oz-agent@warp.dev>"), or "".
+func wordToolEmail(email string) string {
+	if a := agentEmails[strings.ToLower(strings.TrimSpace(email))]; slices.Contains(wordTools, a) {
+		return a
+	}
+	return ""
+}
+
 // agentAddress reports whether email is an address agents use: a GitHub app's ([bot]), an AI company's,
-// one whose domain names a tool other than an everyday word's (cursor.com), or a placeholder (example.com, *.local). A GitHub noreply
+// a wordTool's own, one whose domain names a tool other than an everyday word's (cursor.com), or a placeholder (example.com, *.local). A GitHub noreply
 // address's account name is no sign: people have accounts named devin or claude.
 func agentAddress(email string) bool {
 	email = strings.ToLower(email)
 	at := strings.LastIndex(email, "@")
 	domain := strings.TrimSpace(email[at+1:])
-	return strings.Contains(email[:at], "[bot]") || domain == "anthropic.com" || domain == "openai.com" ||
+	return strings.Contains(email[:at], "[bot]") || domain == "anthropic.com" || domain == "openai.com" || wordToolEmail(email) != "" ||
 		domain == "localhost" || strings.HasSuffix(domain, ".local") || strings.HasSuffix(domain, ".invalid") ||
 		strings.HasSuffix(domain, ".test") || domain == "example.com" || domain == "example.org" || domain == "example.net" ||
 		slices.ContainsFunc(vendorsIn(wordsOf(domain)), func(a string) bool { return !slices.Contains(wordTools, a) })
