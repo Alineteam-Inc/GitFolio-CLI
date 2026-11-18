@@ -7,29 +7,52 @@ import (
 	"unicode"
 )
 
-// Agent signatures found in commit metadata (DESIGN 5.3). Add one line per new agent.
+// Agent signatures found in commit metadata (DESIGN 5.3): the authors and co-authors the agents write
+// themselves, as their docs, source code or commits show them. Add one line per new agent.
 var agentEmails = map[string]string{
-	"noreply@anthropic.com":  "claude-code",
-	"noreply@openai.com":     "codex",
-	"codex@openai.com":       "codex",
-	"cursoragent@cursor.com": "cursor",
-	"copilot@github.com":     "copilot",
-	"aider@aider.chat":       "aider",
-	"amp@ampcode.com":        "amp",
-	"agent@warp.dev":         "warp",
-	"oz-agent@warp.dev":      "warp",
+	"noreply@anthropic.com":       "claude-code",
+	"noreply@openai.com":          "codex",
+	"codex@openai.com":            "codex",
+	"cursoragent@cursor.com":      "cursor",
+	"copilot@github.com":          "copilot",
+	"aider@aider.chat":            "aider",
+	"amp@ampcode.com":             "amp",
+	"agent@warp.dev":              "warp",
+	"oz-agent@warp.dev":           "warp",
+	"noreply@cognition.ai":        "devin",
+	"droid@factory.ai":            "droid",
+	"crush@charm.land":            "crush",
+	"qwen-coder@alibabacloud.com": "qwen-code",
+	"openhands@all-hands.dev":     "openhands",
+	"vibe@mistral.ai":             "mistral-vibe",
+	"noreply@codebuff.com":        "codebuff",
+	"noreply@letta.com":           "letta-code",
+	"noreply@continue.dev":        "continue",
+	"agent@continue.dev":          "continue",
+	"noreply@cline.bot":           "cline",
+	"roomote@roocode.com":         "roo-code",
+	"it+v0agent@vercel.com":       "v0",
 }
 
-// githubBots maps the name part of <id>+<name>@users.noreply.github.com (with "[bot]" removed).
-var githubBots = map[string]string{
-	"copilot":              "copilot",
-	"copilot-swe-agent":    "copilot",
-	"cursor":               "cursor",
-	"devin-ai-integration": "devin",
-	"google-labs-jules":    "jules",
-	"kiro-agent":           "kiro",
-	"opencode-agent":       "opencode",
-	"amazon-q-developer":   "amazon-q",
+// agentBots maps the GitHub apps agents commit as (<id>+<name>[bot]@users.noreply.github.com, or without
+// the id) by name.
+var agentBots = map[string]string{
+	"claude": "claude-code", "anthropic-code-agent": "claude-code", "openai-code-agent": "codex",
+	"chatgpt-codex-connector": "codex", "copilot-swe-agent": "copilot", "cursor": "cursor",
+	"devin-ai-integration": "devin", "google-labs-jules": "jules", "gemini-code-assist": "gemini",
+	"kiro-agent": "kiro", "opencode-agent": "opencode", "amazon-q-developer": "amazon-q", "oz-by-warp": "warp",
+	"warp-factories": "warp", "factory-droid": "droid", "factory-ai": "droid", "augmentcode": "augment",
+	"gpt-engineer-app": "lovable", "lovable-dev": "lovable", "kiloconnect": "kilo", "kilo-code-bot": "kilo",
+	"cline-cloud": "cline", "roomote": "roo-code", "codegen-sh": "codegen", "continue": "continue",
+	"sweep-ai": "sweep",
+}
+
+// agentAccounts maps the GitHub user accounts agents commit as by "<id>+<name>": by the id too, since a
+// person may have the same name.
+var agentAccounts = map[string]string{
+	"198982749+copilot": "copilot", "175728472+copilot": "copilot", "223556219+copilot": "copilot",
+	"242468646+claude": "claude-code", "242516109+codex": "codex", "244629292+kiro-agent": "kiro",
+	"247260674+junie-agent": "junie",
 }
 
 // AI use a commit message tells, read as aline.team reads it (its commit trailer parser), in the last
@@ -41,16 +64,26 @@ var githubBots = map[string]string{
 var (
 	coAuthorLine   = regexp.MustCompile(`(?i)^\s*co-?authored[-\s]by\s*:?\s*(.*?)\s*(?:<([^<>]*)>)?\s*$`)
 	aiFooter       = regexp.MustCompile(`(?i)(generated\s+with|assisted[-\s]by|co-?authored[-\s]by|written\s+by|created\s+(?:with|by)|made[-\s]with)[:\s]+\[?\s*([a-z0-9 ._\-]{0,30})`)
-	sessionTrailer = regexp.MustCompile(`(?im)^\s*(claude-session|agent-logs-url)\s*:`)
+	sessionTrailer = regexp.MustCompile(`(?im)^\s*(claude-session|agent-logs-url|amp-thread-id|copilot-session)\s*:|^\s*(replit)-commit-author\s*:\s*agent\s*$`)
 )
+
+// sessionAgents maps the session trailers agents leave to the agent: the trailer's name says which.
+var sessionAgents = map[string]string{"claude-session": "claude-code", "agent-logs-url": "copilot", "amp-thread-id": "amp",
+	"copilot-session": "copilot", "replit": "replit"}
 
 // aiVendors are the AI tools aline.team looks for, in its order, with GitFolio's agent IDs; '-' parts
 // a name into words.
 var aiVendors = []struct{ name, agent string }{
 	{"claude", "claude-code"}, {"copilot", "copilot"}, {"cursor", "cursor"}, {"codex", "codex"}, {"aider", "aider"},
-	{"codeium", "codeium"}, {"gemini-code", "gemini"}, {"chatgpt", "chatgpt"}, {"devin", "devin"}, {"sweep-ai", "sweep"},
-	{"opencode", "opencode"}, {"ampcode", "amp"},
+	{"gemini-code", "gemini"}, {"devin", "devin"}, {"sweep-ai", "sweep"}, {"opencode", "opencode"}, {"ampcode", "amp"},
+	{"warp", "warp"}, {"factory-droid", "droid"}, {"crush", "crush"}, {"qwen", "qwen-code"}, {"openhands", "openhands"},
+	{"mistral-vibe", "mistral-vibe"}, {"codebuff", "codebuff"}, {"letta", "letta-code"}, {"continue", "continue"},
+	{"sisyphus", "sisyphus"}, {"google-labs-jules", "jules"}, {"kilo-code", "kilo"}, {"cline", "cline"},
+	{"roo-code", "roo-code"},
 }
+
+// personalTools are the tools whose names are also people's: a name naming only them may be a person's.
+var personalTools = []string{"claude-code", "devin", "letta-code"}
 
 var (
 	// vendorSuffixes make one word with a tool's name and still name the tool ("claudecode", "cursoragent").
@@ -68,10 +101,15 @@ func agentByEmail(email string) string {
 		return a
 	}
 	if local, ok := strings.CutSuffix(email, "@users.noreply.github.com"); ok {
+		if a, ok := agentAccounts[local]; ok {
+			return a
+		}
 		if _, name, found := strings.Cut(local, "+"); found {
 			local = name
 		}
-		return githubBots[strings.TrimSuffix(local, "[bot]")]
+		if name, ok := strings.CutSuffix(local, "[bot]"); ok { // an app: no person's account ends so
+			return agentBots[name]
+		}
 	}
 	return ""
 }
@@ -118,7 +156,7 @@ func detectAgents(authorName, authorEmail, message string) []string {
 		pos += m[1]
 	}
 	for _, m := range sessionTrailer.FindAllStringSubmatch(tail, -1) {
-		add(map[bool]string{true: "claude-code", false: "copilot"}[strings.EqualFold(m[1], "claude-session")])
+		add(sessionAgents[strings.ToLower(m[1]+m[2])])
 	}
 	slices.Sort(agents) // map iteration order is random; keep output stable
 	return agents
@@ -126,7 +164,7 @@ func detectAgents(authorName, authorEmail, message string) []string {
 
 // vendorsOf is the AI tools a co-author's name and email, or a footer's phrase, name: from an agent's
 // address, those its name and address name; otherwise those its name names, unless it may be a person's
-// name, names only claude or devin, and looks like one.
+// name, names only personalTools, and looks like one.
 func vendorsOf(name, email string, mayBePerson bool) []string {
 	words := wordsOf(name)
 	found := vendorsIn(words)
@@ -138,8 +176,8 @@ func vendorsOf(name, email string, mayBePerson bool) []string {
 		}
 		return found
 	}
-	// Only claude and devin are also people's names: with another tool's name it is the tool ("Codex Worker").
-	personal := !slices.ContainsFunc(found, func(a string) bool { return a != "claude-code" && a != "devin" })
+	// Only a few tools' names are also people's (personalTools): with another tool's name it is the tool ("Codex Worker").
+	personal := !slices.ContainsFunc(found, func(a string) bool { return !slices.Contains(personalTools, a) })
 	if len(found) == 0 || mayBePerson && personal && looksLikePerson(name, words) {
 		return nil
 	}
