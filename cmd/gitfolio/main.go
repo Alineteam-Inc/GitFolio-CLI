@@ -493,8 +493,8 @@ func cmdAdd(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	if jsonOut {
-		return printJSON(map[string]any{"name": filepath.Base(top), "path": top, "commits": n})
+	if jsonOut { // hooks as status gives them: anything but on means pushes are not collected
+		return printJSON(map[string]any{"name": filepath.Base(top), "path": top, "commits": n, "hooks": hookStatus(top)})
 	}
 	say(detectLang(os.Getenv), "registered", filepath.Base(top), n)
 	return nil

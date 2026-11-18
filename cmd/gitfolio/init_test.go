@@ -345,7 +345,7 @@ func TestSetupJSON(t *testing.T) {
 		t.Errorf("verified: %v", v)
 	}
 
-	if v := must(run(cmdAdd, app)); v["name"] != "app" || v["commits"] != 1.0 {
+	if v := must(run(cmdAdd, app)); v["name"] != "app" || v["commits"] != 1.0 || v["hooks"] != "on" {
 		t.Errorf("add: %v", v)
 	}
 	v = must(run(cmdDeps, "on"))
