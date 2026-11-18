@@ -15,7 +15,8 @@ func TestDetectAgents(t *testing.T) {
 		{"Copilot", "198982749+Copilot@users.noreply.github.com", "feat", "copilot"},
 		{"bot", "opencode-agent[bot]@users.noreply.github.com", "feat", "opencode"},
 		{"me", "me@x.com", "feat\n\nCo-authored-by: Dunn <72735688+Dunn-Kim@users.noreply.github.com>", ""},
-		{"me", "me@x.com", "feat\n\nAssisted-by: OpenAI Codex", "codex"},
+		{"me", "me@x.com", "feat\n\nAssisted-by: OpenAI Codex", ""}, // shaped like a person's name, as aline.team reads it
+		{"me", "me@x.com", "feat\n\nAssisted-by: Codex", "codex"},
 		{"me", "me@x.com", "feat\n\nMade-with: Cursor\nCo-authored-by: Cursor <cursoragent@cursor.com>", "cursor"},
 		// As aline.team reads it: AI help with the message only is not AI help with the code.
 		{"me", "me@x.com", "feat\n\nCommit-Message-Assisted-By: codex (via orca)", ""},
@@ -31,6 +32,22 @@ func TestDetectAgents(t *testing.T) {
 		{"me", "me@x.com", "feat\n\nAgent-Logs-Url: https://github.com/o/r/agents/1", "copilot"},
 		{"me", "me@x.com", "feat\n\nAmp-Thread-ID: T-1", ""},
 		{"me", "me@x.com", "feat\n\nGenerated with Claude\n" + strings.Repeat("line\n", 20), ""}, // only the last 20 lines
+		// A tool is named by a word of its own, and a person's name counts only with an agent's address.
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Zain Haider <123+zainhaider@users.noreply.github.com>", ""},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Devin Lee <devin@corp.com>", ""},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Claude Monet <claude.monet@example.fr>", ""},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Claude Opus 5.5", "claude-code"},
+		{"me", "me@x.com", "feat\n\n  co-authored-by Claude <[EMAIL]>", "claude-code"},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Cursor Agent <agent@cursor.sh>", "cursor"},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Amp <amp@ampcode.com>", "amp"},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Warp <agent@warp.dev>", "warp"},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Copilot Autofix powered by AI <62310815+github-advanced-security[bot]@users.noreply.github.com>", "copilot"},
+		{"me", "me@x.com", "feat\n\nWritten by Haider", ""},
+		{"me", "me@x.com", "feat\n\nCreated by Devin Lee", ""},
+		{"me", "me@x.com", "feat\n\nAssisted-by: Claudette", ""},
+		{"me", "me@x.com", "feat\n\nmade with precursor tools", ""},
+		{"me", "me@x.com", "feat\n\nGenerated with Claude and reviewed by me", "claude-code"},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Gemini Code Assist <gemini@example.com>", "gemini"},
 	} {
 		if got := strings.Join(detectAgents(tc.name, tc.email, tc.msg), ","); got != tc.want {
 			t.Errorf("detectAgents(%q, %q, %q) = %q, want %q", tc.name, tc.email, tc.msg, got, tc.want)
