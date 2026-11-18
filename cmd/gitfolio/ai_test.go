@@ -81,6 +81,14 @@ func TestDetectAgents(t *testing.T) {
 		{"me", "me@x.com", "feat\n\nReplit-Commit-Author: Agent\nReplit-Commit-Session-Id: 1", "replit"},
 		{"me", "me@x.com", "feat\n\nReplit-Commit-Author: User", ""},
 		{"me", "me@x.com", "feat\n\nCo-authored-by: Codeium <a@b.com>", ""}, // no agent writes it
+		// A surname, and everyday words: only as the first word, or by the tool's own email.
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Bob Cline <bob@corp.com>", ""},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Cline Agent <cline-agent@users.noreply.github.com>", "cline"},
+		{"me", "me@x.com", "feat\n\nCreated by me to continue the migration", ""},
+		{"me", "me@x.com", "feat\n\nmade with love and warp drive", ""},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: John Warp <john@corp.com>", ""},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Bob Smith <bob@continue-education.org>", ""},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: Bob Smith <bob@crush.dev>", ""},
 		// Agents as the commit's author: GitHub apps by name, accounts by id and name.
 		{"Devin AI", "158243242+devin-ai-integration[bot]@users.noreply.github.com", "feat", "devin"},
 		{"claude[bot]", "41898282+claude[bot]@users.noreply.github.com", "feat", "claude-code"},

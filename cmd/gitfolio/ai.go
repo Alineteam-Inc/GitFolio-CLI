@@ -83,7 +83,12 @@ var aiVendors = []struct{ name, agent string }{
 }
 
 // personalTools are the tools whose names are also people's: a name naming only them may be a person's.
-var personalTools = []string{"claude-code", "devin", "letta-code"}
+var personalTools = []string{"claude-code", "devin", "letta-code", "cline"}
+
+// wordTools are the tools whose names are also everyday words ("to continue the migration"): one names
+// the tool only as the first word of a name or a footer's phrase, or by its exact email (agentEmails),
+// never by an email's domain.
+var wordTools = []string{"warp", "crush", "continue"}
 
 var (
 	// vendorSuffixes make one word with a tool's name and still name the tool ("claudecode", "cursoragent").
@@ -167,10 +172,12 @@ func detectAgents(authorName, authorEmail, message string) []string {
 // name, names only personalTools, and looks like one.
 func vendorsOf(name, email string, mayBePerson bool) []string {
 	words := wordsOf(name)
-	found := vendorsIn(words)
+	found := slices.DeleteFunc(vendorsIn(words), func(a string) bool {
+		return slices.Contains(wordTools, a) && !slices.Contains(vendorsIn(words[:1]), a)
+	})
 	if strings.Index(email, "@") > 0 && agentAddress(email) { // a masked "[EMAIL]" is no address
 		for _, a := range vendorsIn(wordsOf(email)) {
-			if !slices.Contains(found, a) {
+			if !slices.Contains(found, a) && !slices.Contains(wordTools, a) {
 				found = append(found, a)
 			}
 		}
@@ -209,7 +216,7 @@ func vendorsIn(words []string) []string {
 }
 
 // agentAddress reports whether email is an address agents use: a GitHub app's ([bot]), an AI company's,
-// one whose domain names a tool (cursor.com), or a placeholder (example.com, *.local). A GitHub noreply
+// one whose domain names a tool other than an everyday word's (cursor.com), or a placeholder (example.com, *.local). A GitHub noreply
 // address's account name is no sign: people have accounts named devin or claude.
 func agentAddress(email string) bool {
 	email = strings.ToLower(email)
@@ -218,7 +225,7 @@ func agentAddress(email string) bool {
 	return strings.Contains(email[:at], "[bot]") || domain == "anthropic.com" || domain == "openai.com" ||
 		domain == "localhost" || strings.HasSuffix(domain, ".local") || strings.HasSuffix(domain, ".invalid") ||
 		strings.HasSuffix(domain, ".test") || domain == "example.com" || domain == "example.org" || domain == "example.net" ||
-		len(vendorsIn(wordsOf(domain))) > 0
+		slices.ContainsFunc(vendorsIn(wordsOf(domain)), func(a string) bool { return !slices.Contains(wordTools, a) })
 }
 
 // looksLikePerson reports whether a name is shaped like a person's: two to four words of letters only,
