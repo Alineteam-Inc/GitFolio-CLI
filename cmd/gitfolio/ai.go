@@ -58,7 +58,8 @@ var (
 	// notPersonWords in a name make it a tool's or a sentence's, not a person's.
 	notPersonWords = []string{"code", "agent", "agents", "ai", "bot", "cli", "app", "assistant", "autofix", "chat", "model",
 		"opus", "sonnet", "haiku", "fable", "gpt", "composer", "workspace", "desktop", "coding", "swe", "integration", "ide",
-		"web", "and", "the", "for", "to", "in", "of", "with", "by", "via", "from", "on", "at", "a", "an", "is", "was"}
+		"web", "and", "the", "for", "to", "in", "of", "with", "by", "via", "from", "on", "at", "a", "an", "is", "was",
+		"openai", "anthropic", "github", "google", "microsoft"}
 )
 
 func agentByEmail(email string) string {

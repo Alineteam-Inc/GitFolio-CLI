@@ -15,8 +15,12 @@ func TestDetectAgents(t *testing.T) {
 		{"Copilot", "198982749+Copilot@users.noreply.github.com", "feat", "copilot"},
 		{"bot", "opencode-agent[bot]@users.noreply.github.com", "feat", "opencode"},
 		{"me", "me@x.com", "feat\n\nCo-authored-by: Dunn <72735688+Dunn-Kim@users.noreply.github.com>", ""},
-		{"me", "me@x.com", "feat\n\nAssisted-by: OpenAI Codex", ""}, // shaped like a person's name, as aline.team reads it
-		{"me", "me@x.com", "feat\n\nAssisted-by: Codex", "codex"},
+		{"me", "me@x.com", "feat\n\nAssisted-by: OpenAI Codex", "codex"}, // a company's name is no person's
+		{"me", "me@x.com", "feat\n\nCo-authored-by: GitHub Copilot <[EMAIL]>", "copilot"},
+		{"me", "me@x.com", "feat\n\nCo-authored-by: GitHub Copilot", "copilot"},
+		{"me", "me@x.com", "feat\n\nWritten by Anthropic Claude", "claude-code"},
+		{"me", "me@x.com", "feat\n\nCreated by Microsoft Copilot", "copilot"},
+		{"me", "me@x.com", "feat\n\nAssisted-by: Google Gemini Code Assist", "gemini"},
 		{"me", "me@x.com", "feat\n\nMade-with: Cursor\nCo-authored-by: Cursor <cursoragent@cursor.com>", "cursor"},
 		// As aline.team reads it: AI help with the message only is not AI help with the code.
 		{"me", "me@x.com", "feat\n\nCommit-Message-Assisted-By: codex (via orca)", ""},
