@@ -114,7 +114,9 @@ func TestStats(t *testing.T) {
 	// Local mode: the statistics go first, without commit records, and the type is asked for every time.
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	f.mu.Lock() // after the slow answer above, which still holds the fake server while it sleeps
 	f.devTypeWait, f.devType, apiTimeout = 0, map[string]any{"devTypeTitle": "BUILDER"}, timeout
+	f.mu.Unlock()
 	repo := t.TempDir()
 	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"remote", "add", "origin", "https://github.com/me/app.git"},
 		{"-c", "user.email=dev@example.com", "-c", "user.name=x", "commit", "-q", "--allow-empty", "-m", "feat: start"},
@@ -127,9 +129,13 @@ func TestStats(t *testing.T) {
 	must(saveCredentials(dir, Credentials{Token: testToken, Email: "dev@example.com", Server: srv}))
 	must(saveConfig(dir, Config{Emails: []string{"dev@example.com"}, AutoSyncOff: true}))
 	must(saveRepos(dir, []Repo{newRepo(repo)}))
+	f.mu.Lock()
 	calls := f.devTypeCalls
+	f.mu.Unlock()
 	must(cmdStats(dir, nil))
 	must(cmdStats(dir, nil))
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if _, ok := f.stats["GITHUB/me/app"]; !ok || len(f.commits) != 0 || f.devTypeCalls != calls+2 {
 		t.Errorf("local mode: snapshot sent %v, %d commits sent, %d type requests; want the snapshot only and 2 requests",
 			ok, len(f.commits), f.devTypeCalls-calls)
