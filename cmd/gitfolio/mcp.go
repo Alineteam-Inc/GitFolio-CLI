@@ -496,10 +496,11 @@ func mcpDevType(dir string, args map[string]any) (any, error) {
 		return nil, errors.New(strings.TrimSpace(tr(lang, "statsEmpty")))
 	}
 	res := map[string]any{"year": d.Year, "saved": saved, "fetchedAt": d.FetchedAt, "type": d.Detail}
-	// Why each score is what it is, and the type with AI described, asked for this answer only:
-	// devtype.json keeps just what gitfolio stats shows.
+	// Why each score is what it is, and the type with AI described: devtype.json keeps just what gitfolio
+	// stats shows, so a saved type asks aline.team for them; one fetched now has them already.
 	var raw map[string]any
-	if c.call("GET", fmt.Sprintf("/cli/devtype?yearPeriod=%d", d.Year), nil, &raw) == nil {
+	if d.answer != nil && json.Unmarshal(d.answer, &raw) == nil ||
+		d.answer == nil && c.call("GET", fmt.Sprintf("/cli/devtype?yearPeriod=%d", d.Year), nil, &raw) == nil {
 		why := map[string]string{}
 		for k, v := range raw {
 			s, _ := v.(string)

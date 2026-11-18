@@ -2,6 +2,7 @@ package main
 
 import (
 	"cmp"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -17,11 +18,12 @@ import (
 const devTypeFile = "devtype.json"
 
 type devTypeCache struct {
-	FetchedAt time.Time `json:"fetchedAt"`
-	Year      int       `json:"year"`
-	Account   string    `json:"account"`        // the account it belongs to: another login fetches again
-	Lang      string    `json:"lang,omitempty"` // the language its texts are in: another one fetches again
-	Detail    devType   `json:"detail"`
+	FetchedAt time.Time       `json:"fetchedAt"`
+	Year      int             `json:"year"`
+	Account   string          `json:"account"`        // the account it belongs to: another login fetches again
+	Lang      string          `json:"lang,omitempty"` // the language its texts are in: another one fetches again
+	Detail    devType         `json:"detail"`
+	answer    json.RawMessage // aline.team's whole answer when fetched now (its reasons too), not kept
 }
 
 // devType is what gitfolio stats shows of aline.team's developer type: the type, its five scores
@@ -103,7 +105,12 @@ func devTypeNow(dir, lang string, c *client, refresh bool) (cache devTypeCache, 
 		return cache, false, failure("loginFirst")
 	}
 	var d devType
-	if err := c.call("GET", fmt.Sprintf("/cli/devtype?yearPeriod=%d", year), nil, &d); err != nil {
+	var answer json.RawMessage
+	err = c.call("GET", fmt.Sprintf("/cli/devtype?yearPeriod=%d", year), nil, &answer)
+	if err == nil && len(answer) > 0 {
+		err = json.Unmarshal(answer, &d)
+	}
+	if err != nil {
 		if saved { // offline or refused: what was saved still stands
 			warn(lang, "statsFetchFailed", err)
 			return cache, true, nil
@@ -114,7 +121,7 @@ func devTypeNow(dir, lang string, c *client, refresh bool) (cache devTypeCache, 
 		}
 		return cache, false, err
 	}
-	cache = devTypeCache{FetchedAt: time.Now(), Year: year, Account: c.creds.Email, Lang: lang, Detail: d}
+	cache = devTypeCache{FetchedAt: time.Now(), Year: year, Account: c.creds.Email, Lang: lang, Detail: d, answer: answer}
 	if d.Title != "" { // nothing to analyse yet is not kept
 		if err := saveJSON(p, cache); err != nil {
 			return cache, false, err

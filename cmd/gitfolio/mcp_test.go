@@ -111,6 +111,9 @@ func TestMCP(t *testing.T) {
 		strings.Contains(s, "/home/me") || got["3"].Result.IsError {
 		t.Errorf("status = %s", s)
 	}
+	if f.devTypeCalls != 2 { // devtype refreshed (its reasons from that one answer), then the portfolio's
+		t.Errorf("aline.team was asked for the type %d times, want 2", f.devTypeCalls)
+	}
 	if s := text("4"); !strings.Contains(s, `"devTypeTitle":"KEEPER"`) || !strings.Contains(s, `"agilityStat":50`) ||
 		!strings.Contains(s, `"reasoning":{"agilityReasoning":"You commit on few days.","devTypeDescriptionAi":"Steady with AI."}`) ||
 		strings.Contains(s, "shareCode") {
