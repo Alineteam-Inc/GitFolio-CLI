@@ -19,9 +19,10 @@ import (
 
 const hookMarker = "# gitfolio-managed"
 
-// hookFind locates gitfolio even when a GUI git client runs hooks with a short PATH.
+// hookFind locates gitfolio even when a GUI git client runs hooks with a short PATH. On Windows it is
+// where install.ps1 puts it; LOCALAPPDATA is not set elsewhere.
 const hookFind = `g=$(command -v gitfolio 2>/dev/null)
-for p in /opt/homebrew/bin/gitfolio /usr/local/bin/gitfolio "$HOME/.local/bin/gitfolio" "$HOME/go/bin/gitfolio"; do
+for p in ${LOCALAPPDATA:+"$LOCALAPPDATA/Programs/GitFolio/gitfolio.exe"} /opt/homebrew/bin/gitfolio /usr/local/bin/gitfolio "$HOME/.local/bin/gitfolio" "$HOME/go/bin/gitfolio"; do
 	[ -z "$g" ] && [ -x "$p" ] && g=$p
 done
 `

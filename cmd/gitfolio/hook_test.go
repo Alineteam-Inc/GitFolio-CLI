@@ -419,3 +419,40 @@ func TestPushFromWorktree(t *testing.T) {
 		t.Errorf("collected %d commits (%v), want the worktree's", len(commits), err)
 	}
 }
+
+// A hook run with a short PATH still finds gitfolio where install.ps1 puts it on Windows (Git for
+// Windows' sh, given %LOCALAPPDATA% as a Windows path), and nothing of it when that is not set.
+func TestHookFindsWindowsInstall(t *testing.T) {
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("no sh")
+	}
+	local := t.TempDir()
+	exe := filepath.Join(local, "Programs", "GitFolio", "gitfolio.exe")
+	if err := os.MkdirAll(filepath.Dir(exe), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(exe, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	find := func(env ...string) string {
+		cmd := exec.Command(sh, "-c", hookFind+`printf '%s' "$g"`)
+		for _, kv := range os.Environ() { // the rest, which Windows programs may need (SYSTEMROOT)
+			if k, _, _ := strings.Cut(kv, "="); !slices.Contains([]string{"PATH", "HOME", "LOCALAPPDATA"}, strings.ToUpper(k)) {
+				cmd.Env = append(cmd.Env, kv)
+			}
+		}
+		cmd.Env = append(cmd.Env, append([]string{"PATH=" + filepath.Dir(sh), "HOME=" + t.TempDir()}, env...)...)
+		b, err := cmd.Output()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	if got := find("LOCALAPPDATA=" + local); got == "" || !strings.HasSuffix(filepath.ToSlash(got), "Programs/GitFolio/gitfolio.exe") {
+		t.Errorf("with LOCALAPPDATA found %q", got)
+	}
+	if got := find(); strings.Contains(got, "Programs") {
+		t.Errorf("without LOCALAPPDATA found %q", got)
+	}
+}
