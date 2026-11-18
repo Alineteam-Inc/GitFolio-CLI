@@ -208,6 +208,10 @@ func run(args []string) error {
 		return nil
 	}
 	if args[0] == "version" {
+		if a := slices.DeleteFunc(slices.Clone(args[1:]), func(s string) bool { return s == "--json" || s == "--latest" }); len(a) > 0 {
+			jsonMode(args[1:])
+			return wrongWord("version", a[0], []string{"--json", "--latest"}, "gitfolio version [--json [--latest]]")
+		}
 		if slices.Contains(args[1:], "--json") {
 			// lang: the screen language GitFolio's texts are in, for an app to show its own in the same
 			// release: the release number, also of a build from source ("0.6.0-dev" is 0.6.0); dev: one

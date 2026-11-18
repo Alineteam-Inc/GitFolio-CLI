@@ -208,6 +208,9 @@ func TestJSONBeforeCommand(t *testing.T) {
 	if err := run([]string{"list", "--json"}); errorCode(err) != "usage" {
 		t.Errorf("list --json: %v", err)
 	}
+	if err := run([]string{"version", "--jsn"}); errorCode(err) != "didYouMeanWord" {
+		t.Errorf("version --jsn: %v", err)
+	}
 }
 
 // init's arguments are folders to search: a flag or a missing folder stops it before anything is shown
