@@ -80,8 +80,13 @@ func say(lang, key string, args ...any) { show(out, fmt.Sprintf(tr(lang, key), a
 // sayKV is say for a summary of settings or state: its "label: value" lines are aligned (see settings).
 func sayKV(lang, key string, args ...any) { show(out, settings(fmt.Sprintf(tr(lang, key), args...))) }
 
+// warnMu lets problems found side by side (a repository each, sideBySide) be told one at a time.
+var warnMu sync.Mutex
+
 // warn is say for problems, on stderr. A problem always starts its own paragraph, so it stands out.
 func warn(lang, key string, args ...any) {
+	warnMu.Lock()
+	defer warnMu.Unlock()
 	inParagraph = false
 	mark := symWarn
 	if key == "failed" { // the command itself failed

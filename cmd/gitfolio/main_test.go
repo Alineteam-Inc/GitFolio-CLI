@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -337,5 +338,16 @@ func TestRepoCommandsJSON(t *testing.T) {
 	}
 	if v := run(cmdRemove, twin, "--purge"); v["serverDeletionQueued"] != true {
 		t.Errorf("remove --purge of the last copy: %v", v)
+	}
+}
+
+// Problems found side by side, a repository each (too many package manager files), are told one at a time.
+func TestWarnSideBySide(t *testing.T) {
+	defer func(e io.Writer) { errOut = e }(errOut)
+	var buf bytes.Buffer
+	errOut = &buf
+	sideBySide(8, func(int) { warn("en", "tooManyManifests", maxManifests) })
+	if n := strings.Count(buf.String(), strconv.Itoa(maxManifests)); n != 8 {
+		t.Errorf("%d of 8 warnings:\n%s", n, buf.String())
 	}
 }
