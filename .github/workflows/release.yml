@@ -8,12 +8,16 @@ permissions:
   contents: write # upload release assets
 
 jobs:
-  test: # macOS, Linux and Windows must all pass before anything is released
+  test: # macOS, Linux and Windows must all pass before anything is released (or have, on this commit)
     uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      actions: read # ci.yml looks up whether this commit passed already
 
   release:
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write # upload release assets
       id-token: write # sign the build provenance (Sigstore)

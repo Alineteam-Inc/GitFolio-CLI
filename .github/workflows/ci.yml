@@ -4,15 +4,44 @@ name: ci
 on:
   push:
     branches: [main, stage]
+    paths-ignore: ["**.md", LICENSE, NOTICE] # words only, which no test reads (a release still tests)
   pull_request:
-  workflow_dispatch:
+    paths-ignore: ["**.md", LICENSE, NOTICE]
+  workflow_dispatch: # always tests, even a commit that passed already
   workflow_call: # release.yml runs this first
 
 permissions:
   contents: read
+  actions: read # seen: the runs this commit already had
+
+concurrency: # a newer push to the same branch replaces a run still going
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  # A commit tested on all three already (on stage before main is moved to it, or before its release tag)
+  # is not tested again.
+  seen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      passed: ${{ steps.check.outputs.passed }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: | # if GitHub cannot be asked, it is tested again
+          n=0
+          if [ "$GITHUB_EVENT_NAME" != workflow_dispatch ]; then
+            n=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success&per_page=1" -q .total_count) || n=0
+          fi
+          echo "passed=$([ "${n:-0}" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "runs of ci that passed on $GITHUB_SHA: ${n:-0}"
+
   test:
+    needs: seen
+    if: needs.seen.outputs.passed != 'true'
+    timeout-minutes: 20 # a stuck test does not hold a runner for six hours
     strategy:
       fail-fast: false
       matrix:

@@ -26,7 +26,7 @@
 | `stage` | dev | dev 서버, 주소는 비공개 문서 (`gitfolio config api-url` — 소스 빌드에서만, 릴리스 바이너리는 항상 운영) | 서버 새 계약 테스트. 2026-10-01 `main`에 병합 |
 
 - 흐름: 기능 브랜치 → `stage`(세 OS CI + dev 실검증) → `main`(릴리스). 별도 `prod` 브랜치는 만들지 않는다
-- CI(`.github/workflows/ci.yml`): `main`·`stage` push와 PR마다 ubuntu·macos·windows에서 vet·test·설치 스크립트. 릴리스는 세 OS 통과 후
+- CI(`.github/workflows/ci.yml`): `main`·`stage` push와 PR마다 ubuntu·macos·windows에서 vet·test·설치 스크립트. 릴리스는 세 OS 통과 후. 같은 커밋이 이미 통과했으면(stage → main, 릴리스 태그) 다시 돌리지 않고, `.md`·LICENSE·NOTICE만 바뀐 push는 건너뛴다. 다시 돌리려면 `gh workflow run ci.yml --ref <브랜치>`
 
 ## 작업 규칙
 
