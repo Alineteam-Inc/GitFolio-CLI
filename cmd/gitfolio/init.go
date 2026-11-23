@@ -718,6 +718,8 @@ func lookForRepos(dir string) {
 	if err != nil || rerr != nil || len(cfg.Roots) == 0 {
 		return
 	}
+	st.CheckedAt = time.Now()
+	_ = saveJSON(p, st) // first: status runs at the same time (an app starting asks a few) do not look too
 	found := slices.DeleteFunc(findRepos(cfg.Roots, 5), func(p string) bool { return registeredAt(repos, p) })
 	list := make([]foundRepo, len(found))
 	sideBySide(len(found), func(i int) {
