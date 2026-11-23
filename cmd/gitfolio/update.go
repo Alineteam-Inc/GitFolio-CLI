@@ -319,10 +319,10 @@ git -C "$t" -c core.hooksPath=/dev/null fetch -q && git -C "$t" -c core.hooksPat
 		c.Env = installEnv(tag, exe)
 		return c, s
 	default:
-		s := "curl -fsSL " + installSh + " | sh"
-		c := exec.Command("sh", "-c", s)
+		// Downloaded first: in a pipe sh would end with the empty script's success when curl fails.
+		c := exec.Command("sh", "-c", `s=$(curl -fsSL "$0") && printf '%s\n' "$s" | sh`, installSh)
 		c.Env = installEnv(tag, exe)
-		return c, s
+		return c, "curl -fsSL " + installSh + " | sh"
 	}
 }
 

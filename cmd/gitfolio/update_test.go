@@ -243,6 +243,33 @@ func TestUpdateFailedSaysWhy(t *testing.T) {
 	}
 }
 
+// An update by install.sh fails when the script cannot be downloaded (offline, no curl), not only when
+// it runs and fails: sh alone would end with the empty script's success.
+func TestScriptUpdateFailsWithoutScript(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("install.ps1 on Windows")
+	}
+	bin := t.TempDir()
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	exe := filepath.Join(t.TempDir(), "gitfolio")
+	for _, c := range []struct {
+		curl string
+		ok   bool
+	}{{"exit 6", false}, {"echo 'echo installed'", true}} {
+		if err := os.WriteFile(filepath.Join(bin, "curl"), []byte("#!/bin/sh\n"+c.curl+"\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		cmd, manual := updateCommand("v0.6.1", exe)
+		if manual != "curl -fsSL "+installSh+" | sh" {
+			t.Errorf("by hand: %s", manual)
+		}
+		got, err := cmd.Output()
+		if (err == nil) != c.ok || c.ok && string(got) != "installed\n" {
+			t.Errorf("curl %q: %v %q", c.curl, err, got)
+		}
+	}
+}
+
 // A copy an app ships never looks up, tells about or installs a newer release: the app updates it.
 // version --json says which kind it is.
 func TestBundledCopy(t *testing.T) {
