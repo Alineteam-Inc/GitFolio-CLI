@@ -422,20 +422,18 @@ func mainWorktree(dir string) (string, bool) {
 	if err != nil || !filepath.IsAbs(common) || filepath.Base(common) != ".git" {
 		return "", false
 	}
-	return filepath.Dir(common), true
+	main, err := topLevel(filepath.Dir(common)) // fails for a bare repository cloned into a .git folder
+	return main, err == nil
 }
 
 // repoTop is the top folder of the repository p is in; for a linked worktree the main one's, whose
 // commits it shares, so the repository is registered once.
 func repoTop(p string) (string, error) {
 	top, err := topLevel(p)
-	if err != nil {
-		return "", err
+	if main, ok := mainWorktree(top); err == nil && ok {
+		return main, nil
 	}
-	if main, ok := mainWorktree(top); ok {
-		return topLevel(main)
-	}
-	return top, nil
+	return top, err
 }
 
 // repoIndex is the registered repository whose top folder is top or, for a linked worktree not

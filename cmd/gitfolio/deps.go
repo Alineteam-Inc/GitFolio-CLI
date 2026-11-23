@@ -1001,7 +1001,7 @@ func changeDeps(dir string, args []string) error {
 		if err != nil {
 			return err
 		}
-		i := slices.IndexFunc(repos, func(r Repo) bool { return r.Path == top })
+		i := repoIndex(repos, top)
 		if i < 0 {
 			return failure("notRegisteredAdd", tildePath(top))
 		}
@@ -1051,27 +1051,26 @@ func changeDeps(dir string, args []string) error {
 		if err := parseFlags(fs, flagsFirst(args[1:]), "gitfolio deps scan [path] [--all]"); err != nil {
 			return err
 		}
-		var top string
+		here := -1
 		if !*all {
-			if top, err = topLevel(pathArg(fs.Args())); err != nil {
+			top, err := topLevel(pathArg(fs.Args()))
+			if err != nil {
 				return err
 			}
+			if here = repoIndex(repos, top); here < 0 {
+				return failure("notRegisteredAdd", tildePath(top))
+			}
 		}
-		matched := false
 		for i := range repos {
-			if !*all && repos[i].Path != top {
+			if !*all && i != here {
 				continue
 			}
-			matched = true
 			files, deps, err := refreshDeps(dir, &repos[i])
 			if err != nil {
 				warn(lang, "repoFailed", repos[i].Name, err)
 				continue
 			}
 			say(lang, "depsScanned", repos[i].Name, files, deps)
-		}
-		if !*all && !matched {
-			return failure("notRegisteredAdd", tildePath(top))
 		}
 		return nil
 	}

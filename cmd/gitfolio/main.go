@@ -559,8 +559,7 @@ func cmdRemove(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	// Cleaned: Git for Windows writes C:/x, a missing folder's absolute path is C:\x
-	i := slices.IndexFunc(repos, func(r Repo) bool { return filepath.Clean(r.Path) == filepath.Clean(top) })
+	i := repoIndex(repos, top) // cleaned: Git for Windows writes C:/x, a missing folder's absolute path is C:\x
 	if i < 0 {
 		return failure("notRegistered", tildePath(top))
 	}
@@ -739,8 +738,12 @@ func cmdScan(dir string, args []string) error {
 	}
 	results := []result{}
 	var rs []*Repo
+	here := -1
+	if !*all {
+		here = repoIndex(repos, top)
+	}
 	for i := range repos {
-		if *all || repos[i].Path == top {
+		if *all || i == here {
 			rs = append(rs, &repos[i])
 		}
 	}

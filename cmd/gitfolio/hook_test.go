@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -521,6 +522,27 @@ func TestLinkedWorktreeIsItsRepository(t *testing.T) {
 	}
 	if r, ok := findRepo([]Repo{newRepo(mainTop), newRepo(featTop)}, feat); !ok || r.Path != featTop {
 		t.Errorf("a worktree registered as itself: findRepo = %v %v", r, ok)
+	}
+	// A bare repository cloned into proj/.git, its worktrees beside it: proj is no working tree.
+	proj := filepath.Join(base, "proj")
+	git("clone", "-q", "--bare", up, filepath.Join(proj, ".git"))
+	git("-C", proj, "worktree", "add", "-q", "-b", "w", filepath.Join(proj, "w"), "main")
+	wTop, _ := topLevel(filepath.Join(proj, "w"))
+	if got, err := repoTop(filepath.Join(proj, "w")); err != nil || got != wTop {
+		t.Errorf("repoTop(worktree of proj/.git) = %q, %v; want itself", got, err)
+	}
+	// Other commands find the main one from the worktree too: remove takes it out.
+	dir := t.TempDir()
+	if err := saveRepos(dir, []Repo{newRepo(mainTop)}); err != nil {
+		t.Fatal(err)
+	}
+	defer func(o io.Writer) { out, jsonOut = o, false }(out)
+	out = io.Discard
+	if err := cmdRemove(dir, []string{feat}); err != nil {
+		t.Errorf("remove from the worktree: %v", err)
+	}
+	if left, _ := loadRepos(dir); len(left) != 0 {
+		t.Errorf("left %v", left)
 	}
 }
 
