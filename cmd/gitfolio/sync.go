@@ -498,6 +498,7 @@ func sendPending(dir string, dryRun bool) (n syncCounts, err error) {
 		}
 	}
 	defer progressDone()
+	saved := time.Now()
 	for _, batch := range batches(p.Commits) {
 		progress(lang, "progressSend", done, len(p.Commits))
 		done += len(batch)
@@ -519,8 +520,16 @@ func sendPending(dir string, dryRun bool) (n syncCounts, err error) {
 		if errors.As(err, &ae) && ae.Code == codeUnverified { // only this repository waits: not marked sent
 			st.Waiting[key], err = cmp.Or(strings.ToLower(ae.Email), "?"), nil
 		}
-		if serr := save(); err != nil || serr != nil {
-			return n, errors.Join(err, serr)
+		if err != nil {
+			return n, errors.Join(err, save())
+		}
+		// Not after every batch: a first sync of a long history would write sync.json hundreds of times. A
+		// crash sends these seconds' batches again, which changes nothing; every way out below saves.
+		if time.Since(saved) > 2*time.Second {
+			if err := save(); err != nil {
+				return n, err
+			}
+			saved = time.Now()
 		}
 	}
 	if !local { // after the commits, when there are some
