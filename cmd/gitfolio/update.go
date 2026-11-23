@@ -1,8 +1,13 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"cmp"
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -127,7 +132,31 @@ func installUpdate(latest, exe string) error {
 	if jsonOut {
 		cmd.Stderr = io.MultiWriter(os.Stderr, &said)
 	}
-	if err := cmd.Run(); err != nil {
+	err := cmd.Run()
+	if prefix := caskPrefix(realExe(exe)); prefix != "" {
+		// brew may fail (a tap it cannot bring up to date, another brew at work, an old Homebrew) or leave
+		// the old one: then the release goes in directly, so that no one has to run brew by hand.
+		link := filepath.Join(prefix, "bin", "gitfolio")
+		have, _, verr := copyOf(link)
+		if err == nil && verr == nil && have == strings.TrimPrefix(latest, "v") {
+			return nil
+		}
+		reason := cmp.Or(err, verr)
+		if reason == nil {
+			reason = fmt.Errorf("brew left %s", have)
+		}
+		warn(detectLang(os.Getenv), "updateDirect", reason, latest)
+		target := realExe(link)
+		if _, serr := os.Stat(target); serr != nil {
+			target = realExe(exe)
+		}
+		derr := installRelease(latest, target)
+		if derr == nil {
+			return nil
+		}
+		err = fmt.Errorf("%v, then directly: %w", reason, derr)
+	}
+	if err != nil {
 		f := failure("updateFailed", err, manual).(*failErr)
 		// ponytail: the last 5 lines; keep more if an installer's error runs longer.
 		if lines := strings.Split(strings.TrimSpace(said.String()), "\n"); lines[0] != "" {
@@ -300,12 +329,11 @@ func newer(a, b string) bool {
 // one) was installed, and the same thing written out for the user in case it fails.
 func updateCommand(tag, exe string) (*exec.Cmd, string) {
 	exe = realExe(exe)
-	sep := string(filepath.Separator)
-	switch {
-	case strings.Contains(exe, sep+"Caskroom"+sep): // Homebrew cask, macOS or Linux
+	switch prefix := caskPrefix(exe); {
+	case prefix != "": // Homebrew cask, macOS or Linux
 		// The brew of that Homebrew: an app's PATH has none. Only GitFolio's tap is brought up to date
 		// (brew update fetches every tap and Homebrew itself, which takes minutes); brew update if it fails.
-		brew := filepath.Join(exe[:strings.Index(exe, sep+"Caskroom"+sep)], "bin", "brew")
+		brew := filepath.Join(prefix, "bin", "brew")
 		// As brew update runs git on a tap: no hooks, no prompt; fetch and merge, whatever pull.rebase says.
 		s := `{ t=$("$0" --repository alineteam-inc/tap) && export GIT_TERMINAL_PROMPT=0 &&
 git -C "$t" -c core.hooksPath=/dev/null fetch -q && git -C "$t" -c core.hooksPath=/dev/null merge -q --ff-only '@{u}' ||
@@ -323,6 +351,82 @@ git -C "$t" -c core.hooksPath=/dev/null fetch -q && git -C "$t" -c core.hooksPat
 		c := exec.Command("sh", "-c", `s=$(curl -fsSL "$0") && printf '%s\n' "$s" | sh`, installSh)
 		c.Env = installEnv(tag, exe)
 		return c, "curl -fsSL " + installSh + " | sh"
+	}
+}
+
+// caskPrefix is the Homebrew folder of a copy installed as its cask (/opt/homebrew for
+// /opt/homebrew/Caskroom/gitfolio/0.8.0/gitfolio, exe with links followed), "" for one installed otherwise.
+func caskPrefix(exe string) string {
+	sep := string(filepath.Separator)
+	if i := strings.Index(exe, sep+"Caskroom"+sep); i >= 0 {
+		return exe[:i]
+	}
+	return ""
+}
+
+// releaseDownload is where the release files are, by tag (a variable for tests).
+var releaseDownload = "https://github.com/Alineteam-Inc/GitFolio-CLI/releases/download/"
+
+// installRelease puts release tag's gitfolio in the place of the file target: this system's archive from
+// the release, checked against the release's checksums.txt as install.sh does, written beside target and
+// renamed over it. A Homebrew copy updates so when brew cannot, so that no one has to run brew by hand
+// (casks are macOS and Linux: always a .tar.gz).
+func installRelease(tag, target string) error {
+	name := "gitfolio_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz"
+	c := &http.Client{Timeout: 2 * time.Minute}
+	get := func(file string) ([]byte, error) {
+		resp, err := c.Get(releaseDownload + tag + "/" + file)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("%s: %s", file, resp.Status)
+		}
+		return io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	}
+	sums, err := get("checksums.txt")
+	if err != nil {
+		return err
+	}
+	archive, err := get(name)
+	if err != nil {
+		return err
+	}
+	want := ""
+	for _, line := range strings.Split(string(sums), "\n") {
+		if f := strings.Fields(line); len(f) == 2 && f[1] == name {
+			want = f[0]
+		}
+	}
+	if sum := sha256.Sum256(archive); want == "" || hex.EncodeToString(sum[:]) != want {
+		return fmt.Errorf("%s does not match the release's checksums.txt: not installed", name)
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(archive))
+	if err != nil {
+		return err
+	}
+	tr := tar.NewReader(zr)
+	for {
+		h, err := tr.Next()
+		if err != nil {
+			return fmt.Errorf("%s: no gitfolio in it (%v)", name, err)
+		}
+		if h.Name != "gitfolio" || h.Typeflag != tar.TypeReg {
+			continue
+		}
+		b, err := io.ReadAll(io.LimitReader(tr, 256<<20))
+		if err != nil {
+			return err
+		}
+		tmp := target + ".gitfolio-new"
+		if err = os.WriteFile(tmp, b, 0o755); err == nil {
+			err = os.Rename(tmp, target)
+		}
+		if err != nil {
+			os.Remove(tmp)
+		}
+		return err
 	}
 }
 

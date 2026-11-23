@@ -1,7 +1,11 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +17,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -231,15 +236,116 @@ func TestUpdateFailedSaysWhy(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	defer func(o io.Writer) { out, jsonOut = o, false }(out)
-	out = io.Discard
+	srv := httptest.NewServer(http.NotFoundHandler()) // the release cannot be had either
+	defer srv.Close()
+	defer func(o, e io.Writer, d string) { out, errOut, jsonOut, releaseDownload = o, e, false, d }(out, errOut, releaseDownload)
+	out, errOut, releaseDownload = io.Discard, io.Discard, srv.URL+"/"
 	for _, j := range []bool{true, false} {
 		jsonOut = j
 		err := installUpdate("v0.6.1", cask)
-		if err == nil || !strings.HasPrefix(err.Error(), "Could not update (exit status 1).") ||
+		if err == nil || !strings.HasPrefix(err.Error(), "Could not update (exit status 1, then directly: checksums.txt: 404 Not Found).") ||
 			strings.HasSuffix(err.Error(), "\nError: Fetching the tap failed!") != j {
 			t.Errorf("--json %v: %v", j, err)
 		}
+	}
+}
+
+// When Homebrew cannot update a cask copy, or leaves the old one, the release goes in where it is,
+// checked against the release's checksums.txt, so no one has to run brew by hand; one brew updated is
+// left as it is, and an archive that does not match is not installed.
+func TestBrewFailsReleaseInstalled(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no Homebrew on Windows")
+	}
+	t.Setenv("GITFOLIO_LANG", "en")
+	dir := t.TempDir()
+	prints := func(v string) string {
+		return "#!/bin/sh\nprintf '%s\\n' '{\"version\":\"" + v + "\",\"dev\":false,\"bundled\":false}'\n"
+	}
+	var archive bytes.Buffer
+	zw := gzip.NewWriter(&archive)
+	tw := tar.NewWriter(zw)
+	newer := prints("0.6.1")
+	for _, f := range []struct{ name, body string }{{"LICENSE", "license"}, {"gitfolio", newer}} {
+		if err := tw.WriteHeader(&tar.Header{Name: f.name, Mode: 0o755, Size: int64(len(f.body)), Typeflag: tar.TypeReg}); err != nil {
+			t.Fatal(err)
+		}
+		tw.Write([]byte(f.body))
+	}
+	tw.Close()
+	zw.Close()
+	name := "gitfolio_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz"
+	sum := sha256.Sum256(archive.Bytes())
+	sums := hex.EncodeToString(sum[:]) + "  " + name + "\n"
+	var gets atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gets.Add(1)
+		switch r.URL.Path {
+		case "/v0.6.1/checksums.txt":
+			io.WriteString(w, sums)
+		case "/v0.6.1/" + name:
+			w.Write(archive.Bytes())
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	defer func(o, e io.Writer, d string) { out, errOut, releaseDownload = o, e, d }(out, errOut, releaseDownload)
+	out, errOut, releaseDownload = io.Discard, io.Discard, srv.URL+"/"
+
+	cask := filepath.Join(dir, "brew", "Caskroom", "gitfolio", "0.6.0", "gitfolio")
+	link, brew := filepath.Join(dir, "brew", "bin", "gitfolio"), filepath.Join(dir, "brew", "bin", "brew")
+	// The stand-in brew: no tap (brew update then), and upgrade exits $BREW_EXIT, writing the new copy
+	// only when $BREW_UPGRADES says so.
+	for p, s := range map[string]string{brew: "#!/bin/sh\n[ \"$1\" = --repository ] && exit 1\n[ \"$1\" = upgrade ] && [ -n \"$BREW_UPGRADES\" ] && printf '%s' \"$BREW_UPGRADES\" > \"$CASK\"\nexit ${BREW_EXIT:-0}\n"} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(s), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(cask), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(cask, link); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CASK", cask)
+	for _, c := range []struct {
+		name, exit, upgrades string
+		direct               bool
+	}{
+		{"brew fails", "1", "", true},
+		{"brew leaves the old one", "0", "", true},
+		{"brew updates it", "0", newer, false},
+	} {
+		if err := os.WriteFile(cask, []byte(prints("0.6.0")), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("BREW_EXIT", c.exit)
+		t.Setenv("BREW_UPGRADES", c.upgrades)
+		before := gets.Load()
+		if err := installUpdate("v0.6.1", link); err != nil {
+			t.Errorf("%s: %v", c.name, err)
+		}
+		if b, _ := os.ReadFile(cask); string(b) != newer || (gets.Load() > before) != c.direct {
+			t.Errorf("%s: release downloaded %v, copy now\n%s", c.name, gets.Load() > before, b)
+		}
+	}
+	if left, _ := filepath.Glob(filepath.Join(filepath.Dir(cask), "*.gitfolio-new")); len(left) > 0 {
+		t.Errorf("left %v", left)
+	}
+	sums = strings.Repeat("0", 64) + "  " + name + "\n" // a release whose archive does not match
+	if err := os.WriteFile(cask, []byte(prints("0.6.0")), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("BREW_EXIT", "1")
+	if err := installUpdate("v0.6.1", link); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Errorf("a mismatched archive: %v", err)
+	}
+	if b, _ := os.ReadFile(cask); string(b) != prints("0.6.0") {
+		t.Errorf("a mismatched archive was installed:\n%s", b)
 	}
 }
 

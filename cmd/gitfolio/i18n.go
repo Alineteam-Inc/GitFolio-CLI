@@ -1222,6 +1222,11 @@ var messages = map[string]map[string]string{
 		"ko": "업데이트하지 못했습니다(%v). 직접 업데이트하세요:\n  %s\n",
 		"ja": "更新できませんでした(%v)。手動で更新してください:\n  %s\n",
 	},
+	"updateDirect": {
+		"en": "Homebrew did not update GitFolio (%v); installing %s from its release instead.\n",
+		"ko": "Homebrew로 업데이트되지 않아(%v) 릴리스에서 %s을(를) 직접 설치합니다.\n",
+		"ja": "Homebrew で更新されなかったため(%v)、リリースから %s を直接インストールします。\n",
+	},
 	"hooksBothExist": {
 		"en": "Both %[1]s and %[1]s.gitfolio-orig exist; merge them by hand.\n",
 		"ko": "기존 훅과 백업이 모두 있어 직접 하나로 합쳐야 합니다: %[1]s, %[1]s.gitfolio-orig\n",

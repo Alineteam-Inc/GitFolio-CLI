@@ -81,7 +81,8 @@ Any tool that runs MCP servers can use GitFolio: add the command `gitfolio mcp`.
 ### Update
 
 GitFolio checks for a new release once a day when you run it in a terminal and asks before updating.
-To update right away, run `gitfolio update`.
+To update right away, run `gitfolio update`. A Homebrew copy updates with Homebrew; when Homebrew cannot,
+GitFolio installs the release in its place itself, checked against the release's checksums.
 
 ## Get started
 
@@ -277,7 +278,8 @@ codex plugin add gitfolio@alineteam
 도구와 스킬은 [plugins/gitfolio](plugins/gitfolio)에 있습니다.
 
 **업데이트:** 터미널에서 실행하면 하루 한 번 새 버전을 확인하고, 업데이트할지 묻습니다. 바로 하려면
-`gitfolio update`를 실행하세요.
+`gitfolio update`를 실행하세요. Homebrew로 설치했다면 Homebrew로 업데이트하고, Homebrew가 하지 못하면
+GitFolio가 릴리스의 체크섬을 확인해 그 자리에 직접 설치합니다.
 
 ### 시작하기
 
