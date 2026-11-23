@@ -183,10 +183,12 @@ func cmdEmail(dir string, args []string) error {
 	var done string
 	switch args[0] {
 	case "add":
-		if bad := addEmails(&cfg, args[1:]); len(bad) > 0 {
-			return failure("emailBad", strings.Join(bad, ", "))
-		}
-		if err := saveConfig(dir, cfg); err != nil {
+		if cfg, err = updateConfig(dir, func(cfg *Config) error {
+			if bad := addEmails(cfg, args[1:]); len(bad) > 0 {
+				return failure("emailBad", strings.Join(bad, ", "))
+			}
+			return nil
+		}); err != nil {
 			return err
 		}
 		if c.loggedIn() && interactive() {
@@ -203,8 +205,7 @@ func cmdEmail(dir string, args []string) error {
 		if !c.ensureLogin() {
 			return failure("loginFirst")
 		}
-		addEmails(&cfg, []string{e})
-		if err := saveConfig(dir, cfg); err != nil {
+		if cfg, err = updateConfig(dir, func(cfg *Config) error { addEmails(cfg, []string{e}); return nil }); err != nil {
 			return err
 		}
 		if len(args) == 2 && !interactive() { // a program, in two runs: the code now, --code finishes
@@ -234,14 +235,19 @@ func cmdEmail(dir string, args []string) error {
 		}
 		done = fmt.Sprintf(tr(lang, "emailVerified"), e)
 	case "rm":
-		i := slices.Index(cfg.Emails, e)
-		switch {
-		case i < 0:
-			return failure("emailNotFound", e)
-		case i == 0:
-			return failure("emailRmPrimary", e) // pick another primary first, so there always is one
+		if cfg, err = updateConfig(dir, func(cfg *Config) error {
+			switch i := slices.Index(cfg.Emails, e); i {
+			case -1:
+				return failure("emailNotFound", e)
+			case 0:
+				return failure("emailRmPrimary", e) // pick another primary first, so there always is one
+			default:
+				cfg.Emails = slices.Delete(cfg.Emails, i, i+1)
+				return nil
+			}
+		}); err != nil {
+			return err
 		}
-		cfg.Emails = slices.Delete(cfg.Emails, i, i+1)
 		if c.loggedIn() && slices.Contains(c.creds.Verified, e) {
 			if err := c.unverifyEmail(e); err != nil {
 				warn(lang, "emailUnverifyFailed", e, err) // removed here anyway; aline.team keeps it verified
@@ -252,11 +258,13 @@ func cmdEmail(dir string, args []string) error {
 		if !validEmail(e) {
 			return failure("emailBad", e)
 		}
-		cfg.Emails = append([]string{e}, slices.DeleteFunc(cfg.Emails, func(x string) bool { return x == e })...)
+		if cfg, err = updateConfig(dir, func(cfg *Config) error {
+			cfg.Emails = append([]string{e}, slices.DeleteFunc(cfg.Emails, func(x string) bool { return x == e })...)
+			return nil
+		}); err != nil {
+			return err
+		}
 		done = fmt.Sprintf(tr(lang, "emailPrimary"), e)
-	}
-	if err := saveConfig(dir, cfg); err != nil {
-		return err
 	}
 	if jsonOut {
 		return emailsJSON(cfg, c)
@@ -305,14 +313,22 @@ func addGithubEmails(dir string, c *client, login string, emails []string) ([]st
 			all = append(all, e)
 		}
 	}
-	return all, withLock(dir, func() error {
-		cfg, err := loadConfig(dir) // as it is now, after the minutes at GitHub
-		if err != nil {
-			return err
+	_, err := updateConfig(dir, func(cfg *Config) error { addEmails(cfg, all); return nil }) // after the minutes at GitHub
+	return all, err
+}
+
+// updateConfig changes the settings as they are now, under the data lock: an email command waits for the
+// user (a code, GitHub) without it, so pushes are collected meanwhile, and keeps what they changed.
+func updateConfig(dir string, change func(*Config) error) (cfg Config, err error) {
+	err = withLock(dir, func() error {
+		if cfg, err = loadConfig(dir); err == nil {
+			if err = change(&cfg); err == nil {
+				err = saveConfig(dir, cfg)
+			}
 		}
-		addEmails(&cfg, all)
-		return saveConfig(dir, cfg)
+		return err
 	})
+	return cfg, err
 }
 
 // emailsJSON is the work emails for a program: the primary first, each verified or not, and how to have it taken.

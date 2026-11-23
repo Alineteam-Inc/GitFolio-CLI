@@ -308,11 +308,9 @@ func run(args []string) error {
 	case "portfolio":
 		return cmdPortfolio(dir, args[1:]) // the same; reads this computer's data under the lock
 	case "email":
-		// The list only reads, like whoami, and may wait on aline.team; github waits on the user at GitHub
-		// for minutes, so it takes the lock only to save.
-		if a := withoutJSON(args[1:]); len(a) == 0 || slices.Equal(a, []string{"github"}) {
-			return cmdEmail(dir, args[1:])
-		}
+		// It may wait on aline.team, for a code from an email or on the user at GitHub for minutes, so it
+		// takes the lock only to save (updateConfig).
+		return cmdEmail(dir, args[1:])
 	}
 	return withLock(dir, func() error {
 		switch args[0] {
@@ -339,8 +337,6 @@ func run(args []string) error {
 			return cmdDeps(dir, args[1:])
 		case "schedule":
 			return cmdSchedule(dir, args[1:])
-		case "email":
-			return cmdEmail(dir, args[1:])
 		}
 		return unknownCommand(args[0])
 	})

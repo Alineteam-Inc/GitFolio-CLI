@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"io"
@@ -260,6 +261,46 @@ func TestEmailListOutsideLock(t *testing.T) {
 		t.Errorf("email --json while locked: %v, %v", v, err)
 	}
 }
+
+// While email verify waits for the code from the email it holds no lock, so pushes are collected
+// meanwhile; the email is saved all the same.
+func TestEmailVerifyWaitsOutsideLock(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("AppData", filepath.Join(home, "AppData"))
+	t.Setenv("GITFOLIO_LANG", "en")
+	f := &fakeAline{token: testToken}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	t.Setenv("GITFOLIO_API_URL", srv.URL)
+	dir, err := dataDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := saveCredentials(dir, Credentials{Token: testToken, Email: "dev@example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	defer func(o, e io.Writer, i func() bool, r *bufio.Reader) { out, errOut, interactive, stdin = o, e, i, r }(out, errOut, interactive, stdin)
+	asked, held := false, false
+	out, errOut, interactive = &buf, &buf, func() bool { return true }
+	stdin = bufio.NewReader(readerFunc(func(p []byte) (int, error) {
+		_, err := os.Stat(filepath.Join(dir, "lock"))
+		asked, held = true, held || err == nil
+		return copy(p, "123456\n"), nil
+	}))
+	if err := run([]string{"email", "verify", "work@example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	if cfg, _ := loadConfig(dir); !asked || held || !slices.Contains(cfg.Emails, "work@example.com") {
+		t.Errorf("asked %v, lock held meanwhile %v; emails %v", asked, held, cfg.Emails)
+	}
+}
+
+type readerFunc func([]byte) (int, error)
+
+func (f readerFunc) Read(p []byte) (int, error) { return f(p) }
 
 // scan, status <name>, history, remove and export answer --json too; a long scan tells its progress as
 // JSON lines on stderr.
