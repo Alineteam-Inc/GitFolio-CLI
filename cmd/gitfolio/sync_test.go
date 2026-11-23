@@ -129,6 +129,34 @@ func TestSync(t *testing.T) {
 	sync(1, 0)
 }
 
+// A queued deletion forgets every record of what was sent for the repository, dependencies too, so all
+// of it is sent again if the repository is added back; other repositories keep theirs.
+func TestQueueDeletionForgets(t *testing.T) {
+	dir := t.TempDir()
+	rec := func(keys ...string) map[string]string {
+		m := map[string]string{}
+		for _, k := range keys {
+			m[k] = "x"
+		}
+		return m
+	}
+	if err := saveSync(dir, syncState{Commits: rec("GITHUB/me/app/a1", "GITHUB/me/app2/b1"), Changed: rec("GITHUB/me/app/main.go"),
+		Deps: rec("GITHUB/me/app", "GITHUB/me/app2"), Stats: rec("GITHUB/me/app", "GITHUB/me/app2")}); err != nil {
+		t.Fatal(err)
+	}
+	if err := queueDeletion(dir, deletion{"GITHUB", "me/app"}); err != nil {
+		t.Fatal(err)
+	}
+	st, err := loadSync(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Commits) != 1 || len(st.Changed) != 0 || len(st.Deps) != 1 || len(st.Stats) != 1 || st.Deps["GITHUB/me/app2"] == "" ||
+		!slices.Equal(st.Deletes, []deletion{{"GITHUB", "me/app"}}) {
+		t.Errorf("after the deletion: %+v", st)
+	}
+}
+
 // Requests hold one repository each and at most 500 records.
 func TestBatches(t *testing.T) {
 	var commits []Commit

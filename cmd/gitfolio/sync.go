@@ -161,6 +161,7 @@ func queueDeletion(dir string, d deletion) error {
 		}
 	}
 	delete(st.Stats, d.Provider+"/"+d.Namespace)
+	delete(st.Deps, d.Provider+"/"+d.Namespace)
 	if !slices.Contains(st.Deletes, d) {
 		st.Deletes = append(st.Deletes, d)
 	}
