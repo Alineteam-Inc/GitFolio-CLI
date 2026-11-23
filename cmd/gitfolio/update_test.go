@@ -297,7 +297,8 @@ func TestBrewFailsReleaseInstalled(t *testing.T) {
 	link, brew := filepath.Join(dir, "brew", "bin", "gitfolio"), filepath.Join(dir, "brew", "bin", "brew")
 	// The stand-in brew: no tap (brew update then), and upgrade exits $BREW_EXIT, writing the new copy
 	// only when $BREW_UPGRADES says so.
-	for p, s := range map[string]string{brew: "#!/bin/sh\n[ \"$1\" = --repository ] && exit 1\n[ \"$1\" = upgrade ] && [ -n \"$BREW_UPGRADES\" ] && printf '%s' \"$BREW_UPGRADES\" > \"$CASK\"\nexit ${BREW_EXIT:-0}\n"} {
+	for p, s := range map[string]string{brew: "#!/bin/sh\n[ \"$1\" = --repository ] && exit 1\n[ \"$1\" = upgrade ] && [ -n \"$BREW_UPGRADES\" ] && printf '%s' \"$BREW_UPGRADES\" > \"$CASK\"\n" +
+		"[ -n \"$BREW_SAYS\" ] && echo \"$BREW_SAYS\" >&2\nexit ${BREW_EXIT:-0}\n"} {
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -313,28 +314,57 @@ func TestBrewFailsReleaseInstalled(t *testing.T) {
 	}
 	t.Setenv("CASK", cask)
 	for _, c := range []struct {
-		name, exit, upgrades string
-		direct               bool
+		name, exit, upgrades, says, want string
+		direct, fails                    bool
 	}{
-		{"brew fails", "1", "", true},
-		{"brew leaves the old one", "0", "", true},
-		{"brew updates it", "0", newer, false},
+		{name: "brew fails", exit: "1", want: newer, direct: true},
+		{name: "brew leaves the old one", exit: "0", want: newer, direct: true},
+		{name: "brew updates it", exit: "0", upgrades: newer, want: newer},
+		{name: "brew installs a newer one than asked", exit: "0", upgrades: prints("0.6.2"), want: prints("0.6.2")},
+		// The checksum the tap keeps apart from the release did not match: not installed from the release.
+		{name: "brew's download does not match", exit: "1", says: "Error: SHA256 mismatch", want: prints("0.6.0"), fails: true},
 	} {
-		if err := os.WriteFile(cask, []byte(prints("0.6.0")), 0o755); err != nil {
+		if err := os.WriteFile(cask, []byte(prints("0.6.0")), 0o700); err != nil {
 			t.Fatal(err)
 		}
 		t.Setenv("BREW_EXIT", c.exit)
 		t.Setenv("BREW_UPGRADES", c.upgrades)
+		t.Setenv("BREW_SAYS", c.says)
 		before := gets.Load()
-		if err := installUpdate("v0.6.1", link); err != nil {
+		if err := installUpdate("v0.6.1", link); (err != nil) != c.fails {
 			t.Errorf("%s: %v", c.name, err)
 		}
-		if b, _ := os.ReadFile(cask); string(b) != newer || (gets.Load() > before) != c.direct {
+		if b, _ := os.ReadFile(cask); string(b) != c.want || (gets.Load() > before) != c.direct {
 			t.Errorf("%s: release downloaded %v, copy now\n%s", c.name, gets.Load() > before, b)
 		}
+		if st, err := os.Stat(cask); c.direct && (err != nil || st.Mode().Perm() != 0o755) {
+			t.Errorf("%s: mode %v %v", c.name, st.Mode(), err) // others may run it, as install.sh makes it
+		}
 	}
-	if left, _ := filepath.Glob(filepath.Join(filepath.Dir(cask), "*.gitfolio-new")); len(left) > 0 {
+	t.Setenv("BREW_SAYS", "")
+	if left, _ := filepath.Glob(filepath.Join(filepath.Dir(cask), ".gitfolio-new-*")); len(left) > 0 {
 		t.Errorf("left %v", left)
+	}
+	// A release that does not run here as itself (a newer macOS needed) does not replace the copy.
+	newer = "#!/bin/sh\nexit 1\n"
+	archive.Reset()
+	zw = gzip.NewWriter(&archive)
+	tw = tar.NewWriter(zw)
+	tw.WriteHeader(&tar.Header{Name: "gitfolio", Mode: 0o755, Size: int64(len(newer)), Typeflag: tar.TypeReg})
+	tw.Write([]byte(newer))
+	tw.Close()
+	zw.Close()
+	sum = sha256.Sum256(archive.Bytes())
+	sums = hex.EncodeToString(sum[:]) + "  " + name + "\n"
+	if err := os.WriteFile(cask, []byte(prints("0.6.0")), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("BREW_EXIT", "1")
+	if err := installUpdate("v0.6.1", link); err == nil || !strings.Contains(err.Error(), "does not run here") {
+		t.Errorf("a release that does not run: %v", err)
+	}
+	if b, _ := os.ReadFile(cask); string(b) != prints("0.6.0") {
+		t.Errorf("a release that does not run was installed:\n%s", b)
 	}
 	sums = strings.Repeat("0", 64) + "  " + name + "\n" // a release whose archive does not match
 	if err := os.WriteFile(cask, []byte(prints("0.6.0")), 0o755); err != nil {

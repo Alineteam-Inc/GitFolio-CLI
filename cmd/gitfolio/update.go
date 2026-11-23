@@ -3,7 +3,6 @@ package main
 import (
 	"archive/tar"
 	"bytes"
-	"cmp"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -127,21 +126,19 @@ func noticeUpdate(dir string) {
 // lines on stderr (brew's "Error: …") also end the error: a program shows the message, not stderr.
 func installUpdate(latest, exe string) error {
 	cmd, manual := updateCommand(latest, exe)
-	var said bytes.Buffer
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, out, os.Stderr
-	if jsonOut {
-		cmd.Stderr = io.MultiWriter(os.Stderr, &said)
-	}
+	var said bytes.Buffer // what the installer said: brew's SHA256 mismatch, and the error's end with --json
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, out, io.MultiWriter(os.Stderr, &said)
 	err := cmd.Run()
-	if prefix := caskPrefix(realExe(exe)); prefix != "" {
-		// brew may fail (a tap it cannot bring up to date, another brew at work, an old Homebrew) or leave
-		// the old one: then the release goes in directly, so that no one has to run brew by hand.
+	// A cask brew could not update (a tap it cannot bring up to date, another brew at work, an old
+	// Homebrew), or left older, gets the release directly, so that no one has to run brew by hand. Not one
+	// whose download did not match the checksum the tap keeps apart from the release.
+	if prefix := caskPrefix(realExe(exe)); prefix != "" && !strings.Contains(said.String(), "SHA256 mismatch") {
 		link := filepath.Join(prefix, "bin", "gitfolio")
 		have, _, verr := copyOf(link)
-		if err == nil && verr == nil && have == strings.TrimPrefix(latest, "v") {
-			return nil
+		if err == nil && (verr != nil || !newer(latest, have)) {
+			return nil // brew updated it, to this release or a newer one; or its version cannot be told
 		}
-		reason := cmp.Or(err, verr)
+		reason := err
 		if reason == nil {
 			reason = fmt.Errorf("brew left %s", have)
 		}
@@ -159,7 +156,7 @@ func installUpdate(latest, exe string) error {
 	if err != nil {
 		f := failure("updateFailed", err, manual).(*failErr)
 		// ponytail: the last 5 lines; keep more if an installer's error runs longer.
-		if lines := strings.Split(strings.TrimSpace(said.String()), "\n"); lines[0] != "" {
+		if lines := strings.Split(strings.TrimSpace(said.String()), "\n"); jsonOut && lines[0] != "" {
 			f.msg += "\n\n" + strings.Join(lines[max(0, len(lines)-5):], "\n")
 		}
 		return f
@@ -368,12 +365,21 @@ func caskPrefix(exe string) string {
 var releaseDownload = "https://github.com/Alineteam-Inc/GitFolio-CLI/releases/download/"
 
 // installRelease puts release tag's gitfolio in the place of the file target: this system's archive from
-// the release, checked against the release's checksums.txt as install.sh does, written beside target and
-// renamed over it. A Homebrew copy updates so when brew cannot, so that no one has to run brew by hand
-// (casks are macOS and Linux: always a .tar.gz).
+// the release, checked against the release's checksums.txt as install.sh does, written beside target,
+// run once (it must say it is tag here: a release may need a newer macOS) and renamed over it. A Homebrew
+// copy updates so when brew cannot, so that no one has to run brew by hand (casks are macOS and Linux:
+// always a .tar.gz).
 func installRelease(tag, target string) error {
 	name := "gitfolio_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz"
-	c := &http.Client{Timeout: 2 * time.Minute}
+	c := &http.Client{Timeout: 2 * time.Minute, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if req.URL.Scheme != "https" { // as install.sh: https only
+			return fmt.Errorf("not following a redirect to %s", req.URL.Redacted())
+		}
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return nil
+	}}
 	get := func(file string) ([]byte, error) {
 		resp, err := c.Get(releaseDownload + tag + "/" + file)
 		if err != nil {
@@ -415,16 +421,27 @@ func installRelease(tag, target string) error {
 		if h.Name != "gitfolio" || h.Typeflag != tar.TypeReg {
 			continue
 		}
-		b, err := io.ReadAll(io.LimitReader(tr, 256<<20))
+		f, err := os.CreateTemp(filepath.Dir(target), ".gitfolio-new-*")
 		if err != nil {
 			return err
 		}
-		tmp := target + ".gitfolio-new"
-		if err = os.WriteFile(tmp, b, 0o755); err == nil {
-			err = os.Rename(tmp, target)
+		_, err = io.Copy(f, io.LimitReader(tr, 256<<20))
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+		if err == nil {
+			err = os.Chmod(f.Name(), 0o755) // whatever the umask, as install.sh
+		}
+		if err == nil {
+			if have, _, rerr := copyOf(f.Name()); rerr != nil || have != strings.TrimPrefix(tag, "v") {
+				err = fmt.Errorf("the release's gitfolio does not run here as %s (%s %v): not installed", tag, have, rerr)
+			}
+		}
+		if err == nil {
+			err = os.Rename(f.Name(), target)
 		}
 		if err != nil {
-			os.Remove(tmp)
+			os.Remove(f.Name())
 		}
 		return err
 	}
