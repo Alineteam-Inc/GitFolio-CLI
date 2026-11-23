@@ -153,9 +153,13 @@ func (c *client) call(method, path string, in, out any) error {
 	if !errors.As(err, &ae) || (ae.Code != codeTokenInvalid && ae.Code != codeNotLoggedIn) {
 		return err
 	}
-	c.creds.Token, c.creds.TokenExpiresAt = "", ""
-	if serr := saveCredentials(c.dir, c.creds); serr != nil {
-		return serr
+	if now, lerr := credentialsFor(c.dir, c.base); lerr == nil && now.Token != "" && now.Token != c.creds.Token {
+		c.creds = now // another run logged in again meanwhile: that login is kept, and used
+	} else {
+		c.creds.Token, c.creds.TokenExpiresAt = "", ""
+		if serr := saveCredentials(c.dir, c.creds); serr != nil {
+			return serr
+		}
 	}
 	if c.ensureLogin() {
 		return c.send(method, path, in, out, true)

@@ -589,6 +589,32 @@ func TestRedirectOnlyWhereTheAPIMayBe(t *testing.T) {
 	}
 }
 
+// A token rejected just after another run logged in again (a hook's sync while gitfolio login finished)
+// does not remove that new login: it is kept, and the request goes again with it.
+func TestRejectedTokenKeepsNewLogin(t *testing.T) {
+	f := &fakeAline{token: testToken}
+	srv := httptest.NewServer(f.handler())
+	defer srv.Close()
+	t.Setenv("GITFOLIO_API_URL", srv.URL)
+	dir := t.TempDir()
+	if err := saveCredentials(dir, Credentials{Token: "aln_cli_expired_000000000000000000", Email: "dev@example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := newClient(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := saveCredentials(dir, Credentials{Token: testToken, Email: "dev@example.com"}); err != nil { // the other run's login
+		t.Fatal(err)
+	}
+	if err := c.call("GET", "/cli/me", nil, nil); err != nil {
+		t.Errorf("call after the new login: %v", err)
+	}
+	if saved, _ := loadCredentials(dir); saved.Token != testToken {
+		t.Errorf("the new login was removed: %+v", saved)
+	}
+}
+
 func TestRejectedTokenIsRemoved(t *testing.T) {
 	f := &fakeAline{} // no valid token on the server
 	srv := httptest.NewServer(f.handler())
