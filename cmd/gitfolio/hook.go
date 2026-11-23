@@ -88,19 +88,21 @@ func huskyHooks(dir string, install bool) error {
 			return err
 		}
 		s := string(b)
-		if i := strings.Index(s, hookMarker); i >= 0 {
-			if install {
-				continue // already there
-			}
-			if j := strings.Index(s, hookMarker+" end\n"); j > i {
-				s = s[:i] + s[j+len(hookMarker+" end\n"):]
-			}
-		} else if install {
+		lines := hookMarker + " (github.com/Alineteam-Inc/GitFolio-CLI)\n" + hookFind +
+			`[ -n "$g" ] && "$g" ` + cmd + " </dev/null >/dev/null 2>&1\n" + hookMarker + " end\n"
+		if install && strings.Contains(s, lines) {
+			continue // already there
+		}
+		i, j := strings.Index(s, hookMarker), strings.Index(s, hookMarker+" end\n")
+		switch {
+		case i >= 0 && j > i: // taken out; an earlier GitFolio's lines go in again as they are now
+			s = s[:i] + s[j+len(hookMarker+" end\n"):]
+		case i >= 0 && install, i < 0 && !install:
+			continue // lines cut short are left as they are
+		}
+		if install {
 			first, rest, _ := strings.Cut(cmp.Or(s, "#!/usr/bin/env sh\n"), "\n")
-			s = first + "\n" + hookMarker + " (github.com/Alineteam-Inc/GitFolio-CLI)\n" + hookFind +
-				`[ -n "$g" ] && "$g" ` + cmd + " </dev/null >/dev/null 2>&1\n" + hookMarker + " end\n" + rest
-		} else {
-			continue
+			s = first + "\n" + lines + rest
 		}
 		if err := os.WriteFile(p, []byte(s), 0o755); err != nil {
 			return err
@@ -123,21 +125,35 @@ func installHooks(repo string) error {
 	for name, script := range hookScripts {
 		p := filepath.Join(dir, name)
 		if b, err := os.ReadFile(p); err == nil {
-			if strings.Contains(string(b), hookMarker) {
+			if string(b) == script {
 				continue // already installed
 			}
-			if _, err := os.Stat(p + ".gitfolio-orig"); err == nil {
-				return failure("hooksBothExist", tildePath(p))
-			}
-			if err := os.Rename(p, p+".gitfolio-orig"); err != nil {
-				return err
-			}
+			if !strings.Contains(string(b), hookMarker) { // the user's own: kept, and run first
+				if _, err := os.Stat(p + ".gitfolio-orig"); err == nil {
+					return failure("hooksBothExist", tildePath(p))
+				}
+				if err := os.Rename(p, p+".gitfolio-orig"); err != nil {
+					return err
+				}
+			} // else an earlier GitFolio's, written again
 		}
 		if err := os.WriteFile(p, []byte(script), 0o755); err != nil {
 			return err
 		}
 	}
 	return takeOutHooks(dir, retiredHooks)
+}
+
+// refreshHooks writes again the hooks in dir an earlier GitFolio wrote otherwise (a scan, so a fix to
+// a hook reaches repositories added before it). One that is missing stays missing: the user may have
+// taken it out.
+func refreshHooks(dir string) {
+	for name, script := range hookScripts {
+		p := filepath.Join(dir, name)
+		if b, err := os.ReadFile(p); err == nil && string(b) != script && strings.Contains(string(b), hookMarker) {
+			_ = os.WriteFile(p, []byte(script), 0o755)
+		}
+	}
 }
 
 // uninstallHooks removes gitfolio's hooks and puts back the ones that were there before.

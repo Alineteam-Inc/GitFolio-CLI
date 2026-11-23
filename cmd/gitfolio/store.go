@@ -388,6 +388,7 @@ func readRepo(cfg Config, had storedNow, r *Repo, rebuild bool) (g repoRead) {
 	if hooks, husky, err := hooksDir(r.Path); err == nil && husky {
 		_ = huskyHooks(hooks, true) // husky rewrites its hook files on npm install; put gitfolio's lines back
 	} else if err == nil {
+		refreshHooks(hooks)
 		_ = takeOutHooks(hooks, retiredHooks) // put in by an earlier GitFolio
 	}
 	r.Name = filepath.Base(r.Path)

@@ -200,6 +200,66 @@ func hooksEndToEnd(t *testing.T, bin string, husky bool) {
 
 // Before login nothing is collected: collecting commands fail with a hint and hooks do nothing,
 // while settings and cleanup still work (DESIGN 6.1).
+// A hook an earlier GitFolio wrote is written again as it is now, by add and by a scan, and the user's
+// own one is not taken for it; a scan installs none that is missing. husky's lines too.
+func TestHooksRefreshed(t *testing.T) {
+	old := "#!/bin/sh\n" + hookMarker + " (github.com/Alineteam-Inc/GitFolio-CLI): an earlier one\ngitfolio hook pre-push\n"
+	dir, empty := t.TempDir(), t.TempDir()
+	p := filepath.Join(dir, "pre-push")
+	if err := os.WriteFile(p, []byte(old), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	refreshHooks(dir)
+	refreshHooks(empty)
+	if b, _ := os.ReadFile(p); string(b) != hookScripts["pre-push"] {
+		t.Errorf("scan left\n%s", b)
+	}
+	if _, err := os.Stat(filepath.Join(empty, "pre-push")); err == nil {
+		t.Error("a scan installed a hook that was missing")
+	}
+
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	repo := t.TempDir()
+	if out, err := exec.Command("git", "init", "-q", repo).CombinedOutput(); err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	p = filepath.Join(repo, ".git", "hooks", "pre-push")
+	if err := os.WriteFile(p, []byte(old), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := installHooks(repo); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(p); string(b) != hookScripts["pre-push"] {
+		t.Errorf("add left\n%s", b)
+	}
+	if _, err := os.Stat(p + ".gitfolio-orig"); err == nil {
+		t.Error("an earlier GitFolio's hook was kept as the user's")
+	}
+
+	husky := t.TempDir()
+	p = filepath.Join(husky, "pre-push")
+	stale := huskyStub[:strings.Index(huskyStub, "\n")+1] + hookMarker + " (github.com/Alineteam-Inc/GitFolio-CLI)\nold lines\n" + hookMarker + " end\n" +
+		huskyStub[strings.Index(huskyStub, "\n")+1:]
+	if err := os.WriteFile(p, []byte(stale), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := huskyHooks(husky, true); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(p)
+	if s := string(b); strings.Contains(s, "old lines") || strings.Count(s, hookMarker+" end") != 1 || !strings.Contains(s, hookFind) || !strings.HasSuffix(s, huskyStub[strings.Index(huskyStub, "\n")+1:]) {
+		t.Errorf("husky's pre-push:\n%s", s)
+	}
+	if err := huskyHooks(husky, true); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := os.ReadFile(p); string(again) != string(b) {
+		t.Errorf("written again unchanged:\n%s", again)
+	}
+}
+
 func TestLoginGate(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
