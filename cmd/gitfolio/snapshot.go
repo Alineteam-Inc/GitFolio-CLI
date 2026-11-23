@@ -146,14 +146,31 @@ var substantive = map[string]bool{"ADD": true, "FIX": true, "HOTFIX": true, "PER
 // snapshots builds the snapshot of each repository with a git service remote from the user's stored
 // commits and what the last scan counted of others (Repo.Churn). Repositories go by ID, and a commit
 // that is also in one before by its author time counts as dup, so the account's commits count once.
+// Copies of one repository (two clones of the same address) make one snapshot of all their commits,
+// with what the newest scan counted of others: a snapshot goes per repository address, and two would
+// replace each other on every sync.
 func snapshots(repos []Repo, commits []Commit, author string) []snapshot {
 	byRepo := commitsByRepo(commits)
 	repos = slices.SortedFunc(slices.Values(repos), func(a, b Repo) int { return cmp.Compare(a.ID, b.ID) })
-	owner := map[int64]bool{} // author times of commits counted in a repository before
-	out := []snapshot{}
+	var keys []string
+	copies := map[string][]Repo{}
 	for _, r := range repos {
 		if r.Namespace == "" {
 			continue // never sent
+		}
+		k := r.Provider + "/" + r.Namespace
+		if copies[k] == nil {
+			keys = append(keys, k)
+		}
+		copies[k] = append(copies[k], r)
+	}
+	owner := map[int64]bool{} // author times of commits counted in a repository before
+	out := []snapshot{}
+	for _, k := range keys {
+		r := slices.MaxFunc(copies[k], func(a, b Repo) int { return cmp.Compare(a.AsOf, b.AsOf) }) // the first on a tie
+		var mine []Commit
+		for _, x := range copies[k] {
+			mine = append(mine, byRepo[x.ID]...)
 		}
 		s := snapshot{Format: snapshotFormat, Provider: r.Provider, Namespace: r.Namespace, AuthorEmail: author, AsOf: r.AsOf, Days: map[string]*statDay{}}
 		day := func(k string) *statDay {
@@ -168,7 +185,7 @@ func snapshots(repos []Repo, commits []Commit, author string) []snapshot {
 		}
 		times, created := map[int64]bool{}, map[string]origin{} // created: each path's last creation
 		marks, langs := map[string]bool{}, map[string]bool{}
-		for _, c := range byRepo[r.ID] {
+		for _, c := range mine {
 			at, err := time.Parse(time.RFC3339, c.Date)
 			if err != nil || c.Branch == "" { // not pushed yet (read from HEAD before the first push)
 				continue

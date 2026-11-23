@@ -76,6 +76,25 @@ func TestSnapshots(t *testing.T) {
 	}
 }
 
+// Two clones of one repository make one snapshot: the commits of both (each stored under the one that
+// found it first), and what the newer scan counted of others, not the sum.
+func TestSnapshotOfCopies(t *testing.T) {
+	repos := []Repo{
+		{ID: "x", Provider: "GITHUB", Namespace: "me/app", AsOf: "2026-09-01T00:00:00Z", Churn: map[string]churn{"2026-09-01": {Touches: pair{1}}}},
+		{ID: "y", Provider: "GITHUB", Namespace: "me/app", AsOf: "2026-09-05T00:00:00Z", Churn: map[string]churn{"2026-09-01": {Touches: pair{3}}}},
+	}
+	commits := []Commit{
+		{Repo: "x", Hash: "1", Date: "2026-09-01T10:00:00Z", Branch: "main", Message: "feat: a", CreationType: creationHuman, Files: []FileStat{{Name: "a.go"}}},
+		{Repo: "y", Hash: "2", Date: "2026-09-02T10:00:00Z", Branch: "main", Message: "feat: b", CreationType: creationHuman, Files: []FileStat{{Name: "b.go"}}},
+	}
+	got := snapshots(repos, commits, "me@example.com")
+	if len(got) != 1 || got[0].Days["2026-09-01"].Commits[0] != 1 || got[0].Days["2026-09-02"].Commits[0] != 1 ||
+		got[0].Days["2026-09-01"].Touches[0] != 3 || got[0].AsOf != "2026-09-05T00:00:00Z" {
+		b, _ := json.Marshal(got)
+		t.Errorf("snapshots = %s", b)
+	}
+}
+
 // A file that happens again counts once: on its first day, but on the first day without an AI signal if it had one.
 func TestFirst(t *testing.T) {
 	day := func(d int) time.Time { return time.Date(2026, 9, d, 0, 0, 0, 0, time.UTC) }
