@@ -24,8 +24,8 @@ func TestParseManifest(t *testing.T) {
 		{"go.mod", "module x\n\ngo 1.22\n\nrequire github.com/a/b v1.0.0\n\nrequire (\n\t// pinned until v3\n\tgithub.com/c/d v2.1.0 // see #12\n\tgithub.com/e/f v0.1.0 // indirect\n)\n",
 			"github.com/a/b@v1.0.0 github.com/c/d@v2.1.0"},
 		// pip-compile's output: hashes on the same line, or on lines continued with a backslash
-		{"requirements.txt", "certifi==2024.2.2 \\\n    --hash=sha256:0123\nidna==3.6 --hash=sha256:4567\nurllib3==2.2.1\\\r\n",
-			"certifi@2024.2.2 idna@3.6 urllib3@2.2.1"},
+		{"requirements.txt", "certifi==2024.2.2 \\\n    --hash=sha256:0123\nidna==3.6 --hash=sha256:4567\nsix==1.16\t--hash=sha256:89ab\nurllib3==2.2.1\\\r\n",
+			"certifi@2024.2.2 idna@3.6 six@1.16 urllib3@2.2.1"},
 		{"requirements.txt", "# pinned\nDjango==4.2\nrequests[socks]>=2.31 ; python_version > '3.8'\n-r base.txt\n./local\ngit+https://x/y.git\nnumpy\n" +
 			"-e git+https://github.com/pallets/flask.git#egg=flask\nfastapi @ git+https://github.com/fastapi/fastapi\nmylib @ file:///src/mylib\n",
 			"Django@4.2 fastapi@ flask@ numpy@ requests@>=2.31"},

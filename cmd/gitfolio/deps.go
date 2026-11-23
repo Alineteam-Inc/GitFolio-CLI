@@ -206,7 +206,7 @@ func parseManifest(name, s string) []dep {
 			if i := strings.IndexByte(line, '#'); i >= 0 {
 				line = line[:i]
 			}
-			if i := strings.Index(line, " --"); i >= 0 {
+			if i := strings.Index(strings.ReplaceAll(line, "\t", " "), " --"); i >= 0 {
 				line = line[:i] // options of the requirement: --hash=sha256:…
 			}
 			line = strings.TrimSuffix(strings.TrimSpace(line), `\`) // continued on the next line
