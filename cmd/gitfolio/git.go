@@ -551,6 +551,20 @@ func logRange(repo string) ([]string, error) {
 	return rng, nil
 }
 
+// gitRange runs a git command that reads rng (logRange): the shallow boundaries after --not go on stdin
+// as ^<hash>, since a command line has a length limit (Windows: 32767 characters).
+func gitRange(repo string, rng []string, args ...string) (string, error) {
+	i := slices.Index(rng, "--not")
+	if i < 0 {
+		return git(repo, append(args, rng...)...)
+	}
+	var in strings.Builder
+	for _, h := range rng[i+1:] {
+		in.WriteString("^" + h + "\n")
+	}
+	return gitStdin(repo, in.String(), append(append(args, "--stdin"), rng[:i]...)...)
+}
+
 // remoteBranches maps every commit on a remote-tracking branch to one branch name ("main",
 // "feature/login"). The remote's default branch comes first, so a commit already merged there is
 // reported on it, as the aline.team GitHub sync sees it; other commits get the branch they were pushed to.
@@ -571,9 +585,9 @@ func remoteBranches(repo string) (map[string]string, error) {
 		}
 	}
 	branch := map[string]string{}
-	var done []string
+	var done strings.Builder // the branches before, as ^<ref> on stdin: a command line has a length limit
 	for _, ref := range refs {
-		out, err := git(repo, append([]string{"rev-list", "--no-merges", ref, "--not"}, done...)...)
+		out, err := gitStdin(repo, ref+"\n"+done.String(), "rev-list", "--no-merges", "--stdin")
 		if err != nil {
 			return nil, err
 		}
@@ -581,7 +595,7 @@ func remoteBranches(repo string) (map[string]string, error) {
 		for _, h := range strings.Fields(out) {
 			branch[h] = name
 		}
-		done = append(done, ref)
+		done.WriteString("^" + ref + "\n")
 	}
 	return branch, nil
 }
@@ -594,7 +608,7 @@ func gitLog(repo string, rng []string, files bool) (string, error) {
 	if files {
 		args = append(args, "-z", "-M", "--name-status")
 	}
-	return git(repo, append(args, rng...)...)
+	return gitRange(repo, rng, args...)
 }
 
 // fileStats reads the files of the commits hashes with their changed lines, by commit hash.

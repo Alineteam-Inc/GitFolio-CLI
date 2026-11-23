@@ -699,7 +699,7 @@ func ownCommits(repo string, work []string) (n int, last string) {
 	if err != nil || rng == nil {
 		return 0, ""
 	}
-	out, err := git(repo, append([]string{"log", "--no-merges", "--format=%aE %as"}, rng...)...)
+	out, err := gitRange(repo, rng, "log", "--no-merges", "--format=%aE %as")
 	if err != nil {
 		return 0, ""
 	}

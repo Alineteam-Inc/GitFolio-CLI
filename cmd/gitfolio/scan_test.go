@@ -101,6 +101,33 @@ func TestFilePaths(t *testing.T) {
 	}
 }
 
+// The commits a range leaves out (a shallow clone's boundaries, one per branch fetched) go to git on
+// stdin: on the command line a thousand of them pass Windows' 32767 characters.
+func TestRangeLeavesOutOnStdin(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	repo := t.TempDir()
+	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"commit", "-q", "--allow-empty", "-m", "feat: one"}} {
+		if out, err := exec.Command("git", append([]string{"-C", repo, "-c", "user.name=me", "-c", "user.email=me@example.com"}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	head, err := git(repo, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rng := []string{"HEAD", "--not"}
+	for range 1000 {
+		rng = append(rng, strings.TrimSpace(head))
+	}
+	if out, err := gitLog(repo, rng, false); err != nil || out != "" {
+		t.Errorf("HEAD left out 1000 times: %q %v", out, err)
+	}
+	if out, err := gitLog(repo, rng[:1], false); err != nil || !strings.Contains(out, "feat: one") {
+		t.Errorf("HEAD: %q %v", out, err)
+	}
+}
+
 func TestParseRemote(t *testing.T) {
 	for in, want := range map[string]string{
 		"https://github.com/Alineteam-Inc/GitFolio-CLI.git":    "GITHUB Alineteam-Inc/GitFolio-CLI",
