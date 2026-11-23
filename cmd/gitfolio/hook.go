@@ -231,10 +231,7 @@ func cmdHook(dir string, args []string) error {
 			if err != nil {
 				return err
 			}
-			i := slices.IndexFunc(repos, func(r Repo) bool { return r.Path == top })
-			if main, ok := mainWorktree("."); i < 0 && ok { // pushed from a linked worktree of a registered one
-				i = slices.IndexFunc(repos, func(r Repo) bool { return filepath.Clean(r.Path) == main })
-			}
+			i := repoIndex(repos, top) // or pushed from a linked worktree of a registered one
 			if i < 0 {
 				return nil
 			}

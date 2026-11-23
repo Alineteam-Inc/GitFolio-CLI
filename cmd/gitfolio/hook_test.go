@@ -420,6 +420,50 @@ func TestPushFromWorktree(t *testing.T) {
 	}
 }
 
+// A linked worktree is its repository: add registers the main one, init offers it, and a path in the
+// worktree finds it; one registered before (as itself) is still found. A bare repository's worktree has
+// no main one and stays itself.
+func TestLinkedWorktreeIsItsRepository(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	base := t.TempDir()
+	up, main, feat, bare := filepath.Join(base, "up.git"), filepath.Join(base, "app"), filepath.Join(base, "aaa-fix"), filepath.Join(base, "bw")
+	git := func(args ...string) {
+		t.Helper()
+		if out, err := exec.Command("git", append([]string{"-c", "user.name=me", "-c", "user.email=me@example.com"}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q", "--bare", up)
+	git("clone", "-q", up, main)
+	git("-C", main, "commit", "-q", "--allow-empty", "-m", "feat: start")
+	git("-C", main, "push", "-q", "origin", "HEAD:main")
+	git("-C", main, "worktree", "add", "-q", "-b", "fix", feat) // walked before app
+	git("-C", up, "worktree", "add", "-q", "-b", "bare-fix", bare, "main")
+	mainTop, _ := topLevel(main)
+	featTop, _ := topLevel(feat)
+	bareTop, _ := topLevel(bare)
+	if got, err := repoTop(feat); err != nil || got != mainTop {
+		t.Errorf("repoTop(worktree) = %q, %v; want %q", got, err, mainTop)
+	}
+	if got, err := repoTop(bare); err != nil || got != bareTop {
+		t.Errorf("repoTop(bare repository's worktree) = %q, %v; want itself", got, err)
+	}
+	if got := findRepos([]string{base}, 2); !slices.Equal(got, []string{mainTop, bareTop}) {
+		t.Errorf("findRepos = %q, want %q", got, []string{mainTop, bareTop})
+	}
+	repos := []Repo{newRepo(mainTop)}
+	if r, ok := findRepo(repos, filepath.Join(feat)); !ok || r.Path != mainTop {
+		t.Errorf("findRepo(worktree) = %v %v", r, ok)
+	}
+	if i, ok := aiRepo("en", repos, feat); !ok || i != 0 {
+		t.Errorf("aiRepo(worktree) = %d %v", i, ok)
+	}
+	if r, ok := findRepo([]Repo{newRepo(mainTop), newRepo(featTop)}, feat); !ok || r.Path != featTop {
+		t.Errorf("a worktree registered as itself: findRepo = %v %v", r, ok)
+	}
+}
+
 // A hook run with a short PATH still finds gitfolio where install.ps1 puts it on Windows (Git for
 // Windows' sh, given %LOCALAPPDATA% as a Windows path), and nothing of it when that is not set.
 func TestHookFindsWindowsInstall(t *testing.T) {

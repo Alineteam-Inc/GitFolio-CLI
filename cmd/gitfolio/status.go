@@ -373,7 +373,7 @@ func findRepo(repos []Repo, arg string) (Repo, bool) {
 			return Repo{}, false
 		}
 	}
-	i := slices.IndexFunc(repos, func(r Repo) bool { return filepath.Clean(r.Path) == filepath.Clean(top) }) // as remove
+	i := repoIndex(repos, top)
 	if i < 0 {
 		return Repo{}, false
 	}

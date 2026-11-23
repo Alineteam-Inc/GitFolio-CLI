@@ -485,7 +485,7 @@ func flagsFirst(args []string) []string {
 
 func cmdAdd(dir string, args []string) error {
 	jsonMode(args)
-	top, err := topLevel(pathArg(withoutJSON(args)))
+	top, err := repoTop(pathArg(withoutJSON(args)))
 	if err != nil {
 		return err
 	}

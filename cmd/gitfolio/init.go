@@ -672,7 +672,7 @@ func findRepos(roots []string, maxDepth int) []string {
 			}
 			if _, err := os.Stat(filepath.Join(p, ".git")); err == nil {
 				common, err := git(p, "rev-parse", "--path-format=absolute", "--git-common-dir")
-				top, err2 := topLevel(p)
+				top, err2 := repoTop(p) // the main worktree, also when a linked one is walked first
 				if err == nil && err2 == nil && !seen[strings.TrimSpace(common)] {
 					seen[strings.TrimSpace(common)] = true
 					repos = append(repos, top)

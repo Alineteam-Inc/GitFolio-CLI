@@ -415,13 +415,40 @@ func topLevel(dir string) (string, error) {
 
 // mainWorktree is the main working tree of dir when dir is a linked one (git worktree add), whose pushes
 // run the main one's hooks: only there does git name the shared .git folder by an absolute path.
+// A bare repository's worktrees, or one whose .git folder lives elsewhere (--separate-git-dir), have none.
 func mainWorktree(dir string) (string, bool) {
 	out, err := git(dir, "rev-parse", "--git-common-dir")
 	common := strings.TrimSpace(out)
-	if err != nil || !filepath.IsAbs(common) {
+	if err != nil || !filepath.IsAbs(common) || filepath.Base(common) != ".git" {
 		return "", false
 	}
 	return filepath.Dir(common), true
+}
+
+// repoTop is the top folder of the repository p is in; for a linked worktree the main one's, whose
+// commits it shares, so the repository is registered once.
+func repoTop(p string) (string, error) {
+	top, err := topLevel(p)
+	if err != nil {
+		return "", err
+	}
+	if main, ok := mainWorktree(top); ok {
+		return topLevel(main)
+	}
+	return top, nil
+}
+
+// repoIndex is the registered repository whose top folder is top or, for a linked worktree not
+// registered itself, its main one's; -1 for none.
+func repoIndex(repos []Repo, top string) int {
+	at := func(p string) int {
+		return slices.IndexFunc(repos, func(r Repo) bool { return filepath.Clean(r.Path) == filepath.Clean(p) })
+	}
+	i := at(top)
+	if main, ok := mainWorktree(top); i < 0 && ok {
+		i = at(main)
+	}
+	return i
 }
 
 // providers maps git service hosts to the provider sent to aline.team; any other host is OTHER

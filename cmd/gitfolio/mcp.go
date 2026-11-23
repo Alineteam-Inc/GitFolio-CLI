@@ -550,7 +550,10 @@ func aiRepo(lang string, repos []Repo, arg string) (int, bool) {
 		}
 	}
 	top, err := topLevel(arg)
-	i := slices.IndexFunc(repos, func(r Repo) bool { return err == nil && r.Path == top })
+	if err != nil {
+		return -1, false
+	}
+	i := repoIndex(repos, top)
 	return i, i >= 0
 }
 
@@ -1004,7 +1007,7 @@ func mcpAddRepository(dir string, args map[string]any) (any, error) {
 	if !c.loggedIn() {
 		return nil, errors.New("not logged in: call login_start first")
 	}
-	top, err := topLevel(cmp.Or(p, "."))
+	top, err := repoTop(cmp.Or(p, "."))
 	if err != nil {
 		return nil, err
 	}

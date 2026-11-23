@@ -9,7 +9,6 @@ import (
 	"math"
 	"os"
 	"path"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -300,11 +299,10 @@ func mcpTech(dir string, args map[string]any) (any, error) {
 	key := func(k string) string { return strings.ToLower(techCatalog[cmp.Or(mergedTechs[k], k)].name) }
 	want, _ := args["tech"].(string)
 	if want = strings.ToLower(strings.TrimSpace(want)); want == "" {
-		top, err := topLevel(".")
-		if main, ok := mainWorktree("."); err == nil && ok {
-			top = main
+		here := -1
+		if top, err := topLevel("."); err == nil {
+			here = repoIndex(all, top)
 		}
-		here := slices.IndexFunc(all, func(r Repo) bool { return err == nil && filepath.Clean(r.Path) == filepath.Clean(top) })
 		i := slices.IndexFunc(repos, func(r Repo) bool { return here >= 0 && r.ID == all[here].ID }) // the view has no paths
 		if i < 0 {
 			return nil, errors.New("this folder is not a repository GitFolio collects and AI tools may see: name a tech " +
