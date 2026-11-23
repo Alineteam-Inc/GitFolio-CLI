@@ -199,24 +199,34 @@ func hooksEndToEnd(t *testing.T, bin string, husky bool) {
 	}
 }
 
-// Before login nothing is collected: collecting commands fail with a hint and hooks do nothing,
-// while settings and cleanup still work (DESIGN 6.1).
-// A hook an earlier GitFolio wrote is written again as it is now, by add and by a scan, and the user's
-// own one is not taken for it; a scan installs none that is missing. husky's lines too.
+// A hook an earlier GitFolio wrote is written again as it is now, by add and by a scan; one the user
+// edited is left as it is, and a scan installs none that is missing. husky's lines too.
 func TestHooksRefreshed(t *testing.T) {
-	old := "#!/bin/sh\n" + hookMarker + " (github.com/Alineteam-Inc/GitFolio-CLI): an earlier one\ngitfolio hook pre-push\n"
-	dir, empty := t.TempDir(), t.TempDir()
+	const findBefore = "g=$(command -v gitfolio 2>/dev/null)\n" // hookFind before it looked where install.ps1 puts it
+	old := strings.Replace(hookScripts["pre-push"], hookFind, findBefore, 1)
+	edited := strings.Replace(hookScripts["pre-push"], "exit 0\n", "make lint || exit 1\nexit 0\n", 1)
+	dir, mine, empty := t.TempDir(), t.TempDir(), t.TempDir()
 	p := filepath.Join(dir, "pre-push")
 	if err := os.WriteFile(p, []byte(old), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(mine, "pre-push"), []byte(edited), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	refreshHooks(dir)
+	refreshHooks(mine)
 	refreshHooks(empty)
 	if b, _ := os.ReadFile(p); string(b) != hookScripts["pre-push"] {
 		t.Errorf("scan left\n%s", b)
 	}
+	if b, _ := os.ReadFile(filepath.Join(mine, "pre-push")); string(b) != edited {
+		t.Errorf("scan changed the user's edit:\n%s", b)
+	}
 	if _, err := os.Stat(filepath.Join(empty, "pre-push")); err == nil {
 		t.Error("a scan installed a hook that was missing")
+	}
+	if left, _ := filepath.Glob(filepath.Join(dir, "*.gitfolio-new")); len(left) > 0 {
+		t.Errorf("left %v", left)
 	}
 
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
@@ -238,11 +248,20 @@ func TestHooksRefreshed(t *testing.T) {
 	if _, err := os.Stat(p + ".gitfolio-orig"); err == nil {
 		t.Error("an earlier GitFolio's hook was kept as the user's")
 	}
+	if err := os.WriteFile(p, []byte(edited), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := installHooks(repo); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(p); string(b) != edited {
+		t.Errorf("add changed the user's edit:\n%s", b)
+	}
 
 	husky := t.TempDir()
 	p = filepath.Join(husky, "pre-push")
-	stale := huskyStub[:strings.Index(huskyStub, "\n")+1] + hookMarker + " (github.com/Alineteam-Inc/GitFolio-CLI)\nold lines\n" + hookMarker + " end\n" +
-		huskyStub[strings.Index(huskyStub, "\n")+1:]
+	stale := huskyStub[:strings.Index(huskyStub, "\n")+1] + hookMarker + " (github.com/Alineteam-Inc/GitFolio-CLI)\n" + findBefore +
+		`[ -n "$g" ] && "$g" hook pre-push "$PPID" </dev/null >/dev/null 2>&1` + "\n" + hookMarker + " end\n" + huskyStub[strings.Index(huskyStub, "\n")+1:]
 	if err := os.WriteFile(p, []byte(stale), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +269,7 @@ func TestHooksRefreshed(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(p)
-	if s := string(b); strings.Contains(s, "old lines") || strings.Count(s, hookMarker+" end") != 1 || !strings.Contains(s, hookFind) || !strings.HasSuffix(s, huskyStub[strings.Index(huskyStub, "\n")+1:]) {
+	if s := string(b); strings.Count(s, hookMarker+" end") != 1 || !strings.Contains(s, hookFind) || !strings.HasSuffix(s, huskyStub[strings.Index(huskyStub, "\n")+1:]) {
 		t.Errorf("husky's pre-push:\n%s", s)
 	}
 	if err := huskyHooks(husky, true); err != nil {
@@ -261,6 +280,8 @@ func TestHooksRefreshed(t *testing.T) {
 	}
 }
 
+// Before login nothing is collected: collecting commands fail with a hint and hooks do nothing,
+// while settings and cleanup still work (DESIGN 6.1).
 func TestLoginGate(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

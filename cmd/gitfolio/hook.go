@@ -94,17 +94,18 @@ func huskyHooks(dir string, install bool) error {
 			continue // already there
 		}
 		i, j := strings.Index(s, hookMarker), strings.Index(s, hookMarker+" end\n")
+		end := j + len(hookMarker+" end\n")
 		switch {
-		case i >= 0 && j > i: // taken out; an earlier GitFolio's lines go in again as they are now
-			s = s[:i] + s[j+len(hookMarker+" end\n"):]
+		case i >= 0 && j > i && (!install || earlierHook(s[i:end], lines)): // taken out; an earlier GitFolio's go in again as they are now
+			s = s[:i] + s[end:]
 		case i >= 0 && install, i < 0 && !install:
-			continue // lines cut short are left as they are
+			continue // lines cut short or changed by the user are left as they are
 		}
 		if install {
 			first, rest, _ := strings.Cut(cmp.Or(s, "#!/usr/bin/env sh\n"), "\n")
 			s = first + "\n" + lines + rest
 		}
-		if err := os.WriteFile(p, []byte(s), 0o755); err != nil {
+		if err := writeHook(p, s); err != nil {
 			return err
 		}
 	}
@@ -125,10 +126,12 @@ func installHooks(repo string) error {
 	for name, script := range hookScripts {
 		p := filepath.Join(dir, name)
 		if b, err := os.ReadFile(p); err == nil {
-			if string(b) == script {
+			switch {
+			case string(b) == script:
 				continue // already installed
-			}
-			if !strings.Contains(string(b), hookMarker) { // the user's own: kept, and run first
+			case strings.Contains(string(b), hookMarker) && !earlierHook(string(b), script):
+				continue // GitFolio's, changed by the user: left as it is
+			case !strings.Contains(string(b), hookMarker): // the user's own: kept, and run first
 				if _, err := os.Stat(p + ".gitfolio-orig"); err == nil {
 					return failure("hooksBothExist", tildePath(p))
 				}
@@ -137,7 +140,7 @@ func installHooks(repo string) error {
 				}
 			} // else an earlier GitFolio's, written again
 		}
-		if err := os.WriteFile(p, []byte(script), 0o755); err != nil {
+		if err := writeHook(p, script); err != nil {
 			return err
 		}
 	}
@@ -150,10 +153,31 @@ func installHooks(repo string) error {
 func refreshHooks(dir string) {
 	for name, script := range hookScripts {
 		p := filepath.Join(dir, name)
-		if b, err := os.ReadFile(p); err == nil && string(b) != script && strings.Contains(string(b), hookMarker) {
-			_ = os.WriteFile(p, []byte(script), 0o755)
+		if b, err := os.ReadFile(p); err == nil && earlierHook(string(b), script) {
+			_ = writeHook(p, script)
 		}
 	}
+}
+
+// earlierHook reports whether s is script as an earlier GitFolio wrote it: the same but for where it
+// looks for gitfolio (hookFind), the only part that has changed. One the user edited is not.
+func earlierHook(s, script string) bool {
+	head, tail, ok := strings.Cut(script, hookFind)
+	return ok && s != script && len(s) >= len(head)+len(tail) && strings.HasPrefix(s, head) && strings.HasSuffix(s, tail)
+}
+
+// writeHook replaces hook file p in one step: sh reads a script while it runs it, so one rewritten in
+// place during a push (a long pre-push of the user's own runs first) could run part of each.
+func writeHook(p, script string) error {
+	tmp := p + ".gitfolio-new"
+	err := os.WriteFile(tmp, []byte(script), 0o755)
+	if err == nil {
+		err = os.Rename(tmp, p)
+	}
+	if err != nil {
+		os.Remove(tmp)
+	}
+	return err
 }
 
 // uninstallHooks removes gitfolio's hooks and puts back the ones that were there before.
