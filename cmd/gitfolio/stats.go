@@ -203,7 +203,7 @@ func techUsagesNow(dir, lang string, ai bool) (u techUsages, err error) {
 		if err != nil {
 			return err
 		}
-		u = localStack(repos, commits, deps)
+		u = localStack(repos, repoTechsOf(repos, commits, deps))
 		return nil
 	})
 	return u, err

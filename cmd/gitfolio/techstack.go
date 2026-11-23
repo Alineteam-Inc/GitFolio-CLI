@@ -229,8 +229,8 @@ func knownFile(file string) bool {
 // does not know left out). Per tech: projectCount the repositories, startDate and endDate the first and
 // last day, careerMonths the spans merged where they overlap or touch, activityMonths the months. Each
 // list goes by projectCount, then name.
-func localStack(repos []Repo, commits []Commit, deps []Dependency) techUsages {
-	data := repoTechsOf(repos, commits, deps)
+// data is repoTechsOf the repositories.
+func localStack(repos []Repo, data map[string]*repoTechs) techUsages {
 	type acc struct {
 		projects   int
 		ranges     [][2]time.Time

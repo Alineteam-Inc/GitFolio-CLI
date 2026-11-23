@@ -157,7 +157,7 @@ func portfolioOf(dir, lang string, ai bool) (md string, missing []string, err er
 	if err != nil {
 		warn(lang, "portfolioNoStack", err)
 	}
-	u := localStack(repos, commits, deps) // of the repositories shown (aiView for AI tools)
+	u := localStack(repos, repoTechsOf(repos, commits, deps)) // of the repositories shown (aiView for AI tools)
 	if err != nil || len(u.Languages)+len(u.Frameworks)+len(u.Libraries) == 0 {
 		missing = append(missing, "techStack")
 	}

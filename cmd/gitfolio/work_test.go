@@ -133,6 +133,31 @@ func TestWorkTools(t *testing.T) {
 	}
 }
 
+// commits lists the newest first by the time a date stands for, not by how it reads: 08:00 in Seoul is
+// before 23:30 UTC the day before.
+func TestCommitsToolNewestFirst(t *testing.T) {
+	dir := t.TempDir()
+	if err := saveRepos(dir, []Repo{{ID: "a", Name: "app", AI: aiExposure{Messages: "subjects"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeCommits(dir, []Commit{
+		{Repo: "a", Hash: "h1", Date: "2025-06-10T08:00:00+09:00", Message: "feat: seoul"},
+		{Repo: "a", Hash: "h2", Date: "not a date", Message: "feat: broken"},
+		{Repo: "a", Hash: "h3", Date: "2025-06-09T23:30:00Z", Message: "feat: utc"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	v, err := mcpCommits(dir, map[string]any{"repository": "app"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(v)
+	s := string(b)
+	if i, j := strings.Index(s, "feat: utc"), strings.Index(s, "feat: seoul"); i < 0 || j < 0 || i > j || strings.Contains(s, "broken") {
+		t.Errorf("commits = %s", s)
+	}
+}
+
 // commits answers only where the user lets messages show, subjects or full, without trailers or emails.
 func TestCommitsTool(t *testing.T) {
 	t.Setenv("GITFOLIO_LANG", "en")

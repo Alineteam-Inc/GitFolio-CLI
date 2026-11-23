@@ -286,7 +286,7 @@ func mcpTech(dir string, args map[string]any) (any, error) {
 	}
 	repos := aiView(lang, all)
 	data := repoTechsOf(repos, commits, deps)
-	u := localStack(repos, commits, deps)
+	u := localStack(repos, data)
 	byName := map[string]techExperience{}
 	for kind, list := range map[string][]techUsage{"language": u.Languages, "framework": u.Frameworks, "library": u.Libraries} {
 		for _, t := range list {
@@ -370,7 +370,11 @@ func mcpTech(dir string, args map[string]any) (any, error) {
 		}
 		where.ActiveMonths = len(months)
 		if r.AI.Messages != "" {
-			slices.SortStableFunc(counted, func(a, b Commit) int { return cmp.Compare(touches(b), touches(a)) })
+			lines := make(map[string]int, len(counted)) // by hash: once per commit, not per comparison
+			for _, c := range counted {
+				lines[c.Hash] = touches(c)
+			}
+			slices.SortStableFunc(counted, func(a, b Commit) int { return cmp.Compare(lines[b.Hash], lines[a.Hash]) })
 			for _, c := range counted[:min(3, len(counted))] {
 				subject, _ := messageParts(c.Message)
 				where.Examples = append(where.Examples, subject)
@@ -548,16 +552,25 @@ func mcpCommits(dir string, args map[string]any) (any, error) {
 		Subject   string   `json:"subject"`
 		Body      string   `json:"body,omitempty"`
 	}
+	type dated struct {
+		c Commit
+		t time.Time
+	}
+	var commits []dated
+	for _, c := range byRepo[r.ID] {
+		if t, err := time.Parse(time.RFC3339, c.Date); err == nil && p.has(t.Local()) {
+			commits = append(commits, dated{c, t})
+		}
+	}
+	slices.SortStableFunc(commits, func(a, b dated) int { return b.t.Compare(a.t) }) // newest first, whatever the time zones
 	var list []entry
-	commits := slices.Clone(byRepo[r.ID])
-	slices.SortStableFunc(commits, func(a, b Commit) int { return compareRFC3339(b.Date, a.Date) }) // newest first
-	for _, c := range commits {
-		t, err := time.Parse(time.RFC3339, c.Date)
+	for _, d := range commits {
+		c := d.c
 		typ := cmp.Or(commitKinds[commitType(c.Message)], "other")
-		if err != nil || !p.has(t.Local()) || (kind != "" && typ != kind) {
+		if kind != "" && typ != kind {
 			continue
 		}
-		e := entry{Date: t.Local().Format(time.DateOnly), Type: typ, WithAI: c.CreationType != "" && c.CreationType != creationHuman}
+		e := entry{Date: d.t.Local().Format(time.DateOnly), Type: typ, WithAI: c.CreationType != "" && c.CreationType != creationHuman}
 		kinds := map[string]bool{}
 		for _, f := range c.Files {
 			e.Added, e.Deleted = e.Added+f.Add, e.Deleted+f.Del
@@ -582,11 +595,4 @@ func mcpCommits(dir string, args map[string]any) (any, error) {
 		res["nextOffset"] = offset + len(list)
 	}
 	return res, nil
-}
-
-// compareRFC3339 orders two commit dates by the time they stand for, whatever their time zones.
-func compareRFC3339(a, b string) int {
-	x, _ := time.Parse(time.RFC3339, a)
-	y, _ := time.Parse(time.RFC3339, b)
-	return x.Compare(y)
 }
