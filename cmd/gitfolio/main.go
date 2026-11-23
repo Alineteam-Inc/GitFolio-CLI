@@ -77,10 +77,12 @@ commands:
                         what you did in each repository, all time or from/to a year, month or day
                         (2025, 2025-06, 2025-06-15): commits, months, lines and the share made with AI,
                         by agent (this computer's data only; --json: also kinds of commits and work)
-  portfolio [file.md|file.pdf] [--from file.md] [--json]
+  portfolio [file.md|file.pdf] [--from file.md] [--replace] [--json]
                         write your portfolio from your git history: developer type, tech stack and
                         repositories, as Markdown to edit or a PDF printed with Chrome, Edge or
                         Chromium (no file named: it asks which); --from prints your edited Markdown;
+                        --replace: over a file that is there (otherwise it asks, or refuses
+                        without a terminal; one that fails leaves it as it was);
                         --json: the file written, or without a file the Markdown itself, and what is
                         missing (devType, techStack)
   mcp                   serve GitFolio to AI coding tools (Claude Code, Codex, ...) as an MCP server

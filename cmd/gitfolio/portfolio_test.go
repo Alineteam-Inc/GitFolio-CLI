@@ -151,6 +151,15 @@ func TestPortfolio(t *testing.T) {
 	if err := cmdPortfolio(dir, nil); err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Errorf("an existing portfolio was written over without asking: %v", err)
 	}
+	// --replace (a program that asked the user) writes over it in one step, leaving nothing beside it.
+	must(os.WriteFile(filepath.Join(work, "portfolio.md"), []byte("edited"), 0o644))
+	must(cmdPortfolio(dir, []string{"--replace"}))
+	if md, _ := os.ReadFile(filepath.Join(work, "portfolio.md")); !strings.Contains(string(md), "**KEEPER**") {
+		t.Errorf("--replace left:\n%s", md)
+	}
+	if left, _ := filepath.Glob(filepath.Join(work, "portfolio.md.*")); len(left) > 0 {
+		t.Errorf("left behind: %v", left)
+	}
 	// For a program: the Markdown itself without a file, else the file written; and what is missing.
 	v, err := jsonStdout(t, func() error { return cmdPortfolio(dir, []string{"--json"}) })
 	if missing, _ := v["missing"].([]any); err != nil || !strings.Contains(fmt.Sprint(v["markdown"]), "**KEEPER**") || missing == nil || len(missing) != 0 {
@@ -180,6 +189,13 @@ func TestPortfolio(t *testing.T) {
 	t.Setenv("CHROME_PATH", filepath.Join(work, "no-such-browser"))
 	if err := cmdPortfolio(dir, []string{"cv.pdf"}); err == nil {
 		t.Error("a PDF without a browser")
+	}
+	must(os.WriteFile(filepath.Join(work, "cv.pdf"), []byte("the old one"), 0o644)) // a PDF that fails leaves it
+	if err := cmdPortfolio(dir, []string{"cv.pdf", "--replace"}); err == nil {
+		t.Error("a PDF without a browser, with --replace")
+	}
+	if b, _ := os.ReadFile(filepath.Join(work, "cv.pdf")); string(b) != "the old one" {
+		t.Errorf("a PDF that failed left %q", b)
 	}
 	if runtime.GOOS == "windows" {
 		return // the stand-in browser below is a shell script

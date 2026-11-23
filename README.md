@@ -173,7 +173,8 @@ gitfolio work [--from 2025-06]   # what you did per repository: commits, lines, 
 gitfolio portfolio [file.md|file.pdf]
                                  # your portfolio from your git history: developer type, tech stack, repositories
                                  # (Markdown to edit or a PDF printed with Chrome, Edge or Chromium;
-                                 # no file named: it asks which; --from file.md prints your edited one)
+                                 # no file named: it asks which; --from file.md prints your edited one;
+                                 # --replace writes over a file that is there)
 gitfolio mcp                     # serve GitFolio to AI coding tools (Claude Code, Codex) over stdio
 gitfolio <command> --json        # for programs: one JSON document on stdout (status, sync, stats, stack, login,
                                  # email, add, deps, config, schedule, uninstall, version …; `gitfolio help`)
@@ -356,7 +357,8 @@ gitfolio work [--from 2025-06]   # 저장소별로 한 작업: 커밋, 줄 수, 
 gitfolio portfolio [파일.md|파일.pdf]
                                  # git 이력으로 만든 포트폴리오: 개발자 유형, 기술 스택, 저장소
                                  # (고쳐 쓸 Markdown 또는 Chrome·Edge·Chromium으로 인쇄한 PDF.
-                                 # 파일 이름이 없으면 형식을 물음, --from 파일.md는 고친 파일을 PDF로)
+                                 # 파일 이름이 없으면 형식을 물음, --from 파일.md는 고친 파일을 PDF로,
+                                 # --replace는 있는 파일 위에 씀)
 gitfolio mcp                     # AI 코딩 도구(Claude Code, Codex)에 GitFolio를 MCP 서버로 제공
 gitfolio <명령> --json           # 프로그램용: 표준 출력에 JSON 하나 (status, sync, stats, stack, login, email,
                                  # add, deps, config, schedule, uninstall, version 등. `gitfolio help` 참고)

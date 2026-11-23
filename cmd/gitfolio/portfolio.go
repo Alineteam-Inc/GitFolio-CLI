@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const portfolioUsage = "gitfolio portfolio [file.md|file.pdf] [--from file.md] [--json]"
+const portfolioUsage = "gitfolio portfolio [file.md|file.pdf] [--from file.md] [--replace] [--json]"
 
 // cmdPortfolio writes the user's portfolio from their git history: the developer type and tech stack
 // periods aline.team works out, and the repositories as collected on this computer. Markdown, to edit
@@ -29,15 +29,18 @@ func cmdPortfolio(dir string, args []string) error {
 	args = withoutJSON(args)
 	lang := detectLang(os.Getenv)
 	var out, from string
+	replace := false
 	for i := 0; i < len(args); i++ {
 		switch {
 		case args[i] == "--from" && i+1 < len(args):
 			i++
 			from = args[i]
+		case args[i] == "--replace":
+			replace = true
 		case !strings.HasPrefix(args[i], "-") && out == "":
 			out = args[i]
 		default:
-			return wrongWord("portfolio", args[i], []string{"--from"}, portfolioUsage)
+			return wrongWord("portfolio", args[i], []string{"--from", "--replace"}, portfolioUsage)
 		}
 	}
 	var missing []string
@@ -64,7 +67,7 @@ func cmdPortfolio(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(out); err == nil { // never over an edited portfolio unasked
+	if _, err := os.Stat(out); err == nil && !replace { // never over an edited portfolio unasked
 		if !interactive() {
 			return failure("portfolioExists", tildePath(out))
 		}
@@ -89,8 +92,8 @@ func cmdPortfolio(dir string, args []string) error {
 	if pdf {
 		format, saved = "pdf", "portfolioSavedPDF"
 		err = printPDF(portfolioPage(lang, md, base), out)
-	} else {
-		err = os.WriteFile(out, []byte(md), 0o644)
+	} else if err = writeFile(out, []byte(md)); err == nil { // in one step, as the PDF: one that fails leaves the old file
+		err = os.Chmod(out, 0o644)
 	}
 	if err != nil {
 		return err
