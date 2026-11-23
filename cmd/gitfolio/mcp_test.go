@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -492,6 +493,18 @@ func TestMCPStatusMasksSyncError(t *testing.T) {
 	v, err = mcpStatus(dir, nil)
 	if got := fmt.Sprint(v.(map[string]any)["lastSyncError"]); err != nil || home == "" || strings.Contains(got, home) || !strings.HasPrefix(got, "open ~") {
 		t.Errorf("lastSyncError = %q, %v", got, err)
+	}
+	if runtime.GOOS != "windows" { // only the home folder itself: not a longer name that starts like it, nor / as home
+		for h, want := range map[string]string{"/home/al": "open /home/alice/x: denied", "/": "open /home/alice/x: denied"} {
+			t.Setenv("HOME", h)
+			if err := saveSync(dir, syncState{LastError: "open /home/alice/x: denied"}); err != nil {
+				t.Fatal(err)
+			}
+			v, err = mcpStatus(dir, nil)
+			if got := fmt.Sprint(v.(map[string]any)["lastSyncError"]); err != nil || got != want {
+				t.Errorf("home %s: lastSyncError = %q, %v", h, got, err)
+			}
+		}
 	}
 }
 

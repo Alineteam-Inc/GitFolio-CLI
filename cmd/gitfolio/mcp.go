@@ -464,8 +464,9 @@ func mcpStatus(dir string, _ map[string]any) (any, error) {
 	// The error masked as commit messages are: a failed request names its URL, the address of a repository
 	// that may be hidden from AI tools. A failed file names its path: the home folder in it shows as ~.
 	lastErr := newMasker(cfg.Mask).apply(st.LastError)
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		lastErr = strings.ReplaceAll(lastErr, home, "~")
+	if home, err := os.UserHomeDir(); err == nil && home != "" { // as a folder: not /home/al in /home/alice, nor every / for a home of /
+		sep := string(filepath.Separator)
+		lastErr = strings.NewReplacer(home+sep, "~"+sep, filepath.ToSlash(home)+"/", "~/").Replace(lastErr)
 	}
 	res := map[string]any{"loggedIn": c.loggedIn(), "repositories": list, "syncMode": syncMode(cfg), "lastSync": st.LastSync,
 		"lastSyncError": lastErr}
