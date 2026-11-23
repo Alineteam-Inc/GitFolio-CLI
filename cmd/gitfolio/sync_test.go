@@ -157,6 +157,16 @@ func TestQueueDeletionForgets(t *testing.T) {
 	}
 }
 
+// After a move the statistics and dependencies go again under the new name; nothing goes to the old one.
+func TestRenameSentForgetsOldName(t *testing.T) {
+	st := syncState{Commits: map[string]string{}, Changed: map[string]string{},
+		Deps: map[string]string{"GITLAB/me/app": "x", "GITHUB/me/other": "y"}, Stats: map[string]string{"GITLAB/me/app": "x"}}
+	renameSent(&st, repoMove{deletion{"GITLAB", "me/app"}, deletion{"GITHUB", "me/app"}}, nil)
+	if len(st.Stats) != 0 || len(st.Deps) != 1 || st.Deps["GITHUB/me/other"] != "y" {
+		t.Errorf("after the move: stats %v, deps %v", st.Stats, st.Deps)
+	}
+}
+
 // Requests hold one repository each and at most 500 records.
 func TestBatches(t *testing.T) {
 	var commits []Commit

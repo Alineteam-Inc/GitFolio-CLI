@@ -201,6 +201,7 @@ func renameSent(st *syncState, mv repoMove, commits []Commit) {
 		delete(st.Commits, commitKey(old))
 	}
 	delete(st.Stats, mv.From.Provider+"/"+mv.From.Namespace) // the snapshot goes again under the new name
+	delete(st.Deps, mv.From.Provider+"/"+mv.From.Namespace)  // and the dependencies
 	oldKey, newKey := mv.From.Provider+"/"+mv.From.Namespace+"/", mv.To.Provider+"/"+mv.To.Namespace+"/"
 	for k, at := range st.Changed {
 		if name, ok := strings.CutPrefix(k, oldKey); ok {
