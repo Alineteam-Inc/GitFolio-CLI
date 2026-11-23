@@ -554,6 +554,41 @@ func TestZoneFromPath(t *testing.T) {
 }
 
 // A token the server rejects (A001: expired, revoked or unknown) is removed locally.
+// A redirect goes only where the API may be (https, or http on this computer): the login token would
+// go there too, in the clear on http.
+func TestRedirectOnlyWhereTheAPIMayBe(t *testing.T) {
+	var got []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = append(got, r.URL.Path+" "+r.Header.Get("Authorization"))
+		switch r.URL.Path {
+		case "/cli/me":
+			http.Redirect(w, r, "http://127.0.0.2:9/cli/me", http.StatusFound) // http, and not this computer's name
+		case "/cli/here":
+			http.Redirect(w, r, "/cli/there", http.StatusFound)
+		default:
+			w.Write([]byte(`{"success":true,"data":{}}`))
+		}
+	}))
+	defer srv.Close()
+	t.Setenv("GITFOLIO_API_URL", srv.URL)
+	defer func(d time.Duration) { apiTimeout = d }(apiTimeout)
+	apiTimeout = 2 * time.Second // a redirect followed would wait for 127.0.0.2
+	dir := t.TempDir()
+	if err := saveCredentials(dir, Credentials{Token: testToken, Email: "dev@example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := newClient(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.send("GET", "/cli/me", nil, nil, true); err == nil || !strings.Contains(err.Error(), "not following a redirect to http://127.0.0.2:9") {
+		t.Errorf("redirect to http elsewhere: %v", err)
+	}
+	if err := c.send("GET", "/cli/here", nil, nil, true); err != nil || len(got) != 3 || got[2] != "/cli/there Bearer "+testToken {
+		t.Errorf("redirect on the same server: %v, requests %q", err, got)
+	}
+}
+
 func TestRejectedTokenIsRemoved(t *testing.T) {
 	f := &fakeAline{} // no valid token on the server
 	srv := httptest.NewServer(f.handler())

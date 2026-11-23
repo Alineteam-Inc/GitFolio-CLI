@@ -117,7 +117,19 @@ func newClient(dir string) (*client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &client{base: base, http: &http.Client{Timeout: apiTimeout}, dir: dir, creds: creds}, nil
+	return &client{base: base, http: &http.Client{Timeout: apiTimeout, CheckRedirect: apiRedirect}, dir: dir, creds: creds}, nil
+}
+
+// apiRedirect follows a redirect only to where the API may be (checkAPIURL): the login token goes along,
+// and Go checks only the host name, so on http it would go in the clear.
+func apiRedirect(req *http.Request, via []*http.Request) error {
+	if checkAPIURL(req.URL.String()) != nil {
+		return fmt.Errorf("not following a redirect to %s", req.URL.Redacted())
+	}
+	if len(via) >= 10 {
+		return errors.New("stopped after 10 redirects")
+	}
+	return nil
 }
 
 // credentialsFor loads the login for the aline.team API at base. A token issued by another server
