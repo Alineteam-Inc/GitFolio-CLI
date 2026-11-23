@@ -28,8 +28,9 @@ const usage = `usage: gitfolio <command> [arguments]
 
 commands:
   init [folder...]      first-time setup: data policy, aline.team log in / sign up, then find the repositories
-                        under your code folders and choose which ones to collect (without git, it offers
-                        to install it first)
+                        under your code folders and choose which ones to collect: the ones with your
+                        commits, all chosen until you leave some out (without git, it offers to install
+                        it first). Later, status offers once a day the new ones in those folders
   init --policy [--json] | init --scan [--root <folder>]... --json
                         init's steps for a program, without questions: the data policy and what
                         starting GitFolio does, then (logged in) the repositories and emails found;
@@ -50,6 +51,9 @@ commands:
   remove [path] [--purge] [--json]
                         unregister a repository and restore its previous hooks
                         (--purge: also delete its collected commits, here and on aline.team)
+  ignore [path...] [--undo] [--json]
+                        repositories in your folders that status no longer offers as new ones
+                        (--undo: offer them again); no path: list them
   scan [path] [--all] [--rebuild] [--json]
                         collect new commits (--all: every registered repository,
                         --rebuild: drop stored commits and collect again)
@@ -313,11 +317,15 @@ func run(args []string) error {
 		// It may wait on aline.team, for a code from an email or on the user at GitHub for minutes, so it
 		// takes the lock only to save (updateConfig).
 		return cmdEmail(dir, args[1:])
+	case "status":
+		lookForRepos(dir) // at most once a day; outside the lock, as it reads git a while
 	}
 	return withLock(dir, func() error {
 		switch args[0] {
 		case "add":
 			return cmdAdd(dir, args[1:])
+		case "ignore":
+			return cmdIgnore(dir, args[1:])
 		case "remove":
 			return cmdRemove(dir, args[1:])
 		case "scan":

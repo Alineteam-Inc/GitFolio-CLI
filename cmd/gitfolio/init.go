@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 )
 
 // logo is ASCII only so it renders in any terminal font, including Windows consoles (DESIGN 7.2).
@@ -396,8 +397,8 @@ func chooseEmails(lang string, creds Credentials, have, repos []string) []string
 	return have
 }
 
-// chooseRepos lists the unregistered repositories with the user's commits and asks which to collect.
-// Nothing is chosen by default: company code is never collected unless the user picks it.
+// chooseRepos lists the unregistered repositories with the user's commits and asks which to collect:
+// all of them unless the user says otherwise (Enter), never without a person to say so.
 func chooseRepos(lang, dir string, found, work []string) ([]string, error) {
 	repos, err := loadRepos(dir)
 	if err != nil {
@@ -440,7 +441,7 @@ func chooseRepos(lang, dir string, found, work []string) ([]string, error) {
 	for interactive() && !stdinClosed {
 		answer := prompt(tr(lang, "selectRepos"))
 		if answer == "" {
-			break
+			answer = "all" // listed chosen: the user's own commits, which they may still leave out
 		}
 		if sel, err = parseSelection(answer, len(cands)); err == nil {
 			break
@@ -686,6 +687,108 @@ func findRepos(roots []string, maxDepth int) []string {
 		})
 	}
 	return repos
+}
+
+// foundFile keeps what status found last in the folders init looked in (Config.Roots).
+const foundFile = "found.json"
+
+type foundState struct {
+	CheckedAt    time.Time   `json:"checkedAt"`
+	Repositories []foundRepo `json:"repositories"`
+}
+
+type foundRepo struct {
+	Name       string `json:"name"`
+	Path       string `json:"path"`
+	OwnCommits int    `json:"ownCommits"`
+	LastCommit string `json:"lastCommit,omitempty"` // of the user's own commits
+}
+
+// lookForRepos looks again in the folders init looked in, at most once a day, for repositories with the
+// user's commits that are not registered: status offers them (nothing is added by itself). It runs
+// outside the data lock, as it reads every such repository's history; it writes found.json alone.
+func lookForRepos(dir string) {
+	p := filepath.Join(dir, foundFile)
+	var st foundState
+	if loadJSON(p, &st) == nil && time.Since(st.CheckedAt) < 24*time.Hour {
+		return
+	}
+	cfg, err := loadConfig(dir)
+	repos, rerr := loadRepos(dir)
+	if err != nil || rerr != nil || len(cfg.Roots) == 0 {
+		return
+	}
+	found := slices.DeleteFunc(findRepos(cfg.Roots, 5), func(p string) bool { return registeredAt(repos, p) })
+	list := make([]foundRepo, len(found))
+	sideBySide(len(found), func(i int) {
+		n, last := ownCommits(found[i], cfg.Emails)
+		list[i] = foundRepo{filepath.Base(found[i]), found[i], n, last}
+	})
+	st = foundState{time.Now(), slices.DeleteFunc(list, func(r foundRepo) bool { return r.OwnCommits == 0 })}
+	_ = saveJSON(p, st)
+}
+
+// newRepos are the repositories the last look found that are still neither registered nor ignored.
+func newRepos(dir string, cfg Config, repos []Repo) []foundRepo {
+	var st foundState
+	_ = loadJSON(filepath.Join(dir, foundFile), &st)
+	return slices.DeleteFunc(append([]foundRepo{}, st.Repositories...), func(r foundRepo) bool {
+		return registeredAt(repos, r.Path) || slices.ContainsFunc(cfg.Ignored, func(x string) bool { return filepath.Clean(x) == filepath.Clean(r.Path) })
+	})
+}
+
+const ignoreUsage = "gitfolio ignore [path...] [--undo] [--json]"
+
+// cmdIgnore lists the repositories status no longer offers as new ones, or adds some (with --undo, takes
+// them out). Callers hold the data lock.
+func cmdIgnore(dir string, args []string) error {
+	jsonMode(args)
+	args = withoutJSON(args)
+	undo := slices.Contains(args, "--undo")
+	args = slices.DeleteFunc(args, func(a string) bool { return a == "--undo" })
+	if slices.ContainsFunc(args, func(a string) bool { return strings.HasPrefix(a, "-") }) || undo && len(args) == 0 {
+		return failure("usage", ignoreUsage)
+	}
+	cfg, err := loadConfig(dir)
+	if err != nil {
+		return err
+	}
+	for _, a := range args {
+		p, err := repoTop(a)
+		if err != nil { // a folder that is gone, or not a repository any more
+			if p, err = filepath.Abs(a); err != nil {
+				return err
+			}
+		}
+		cfg.Ignored = slices.DeleteFunc(cfg.Ignored, func(x string) bool { return filepath.Clean(x) == filepath.Clean(p) })
+		if !undo {
+			cfg.Ignored = append(cfg.Ignored, p)
+		}
+	}
+	if len(args) > 0 {
+		if err := saveConfig(dir, cfg); err != nil {
+			return err
+		}
+	}
+	if jsonOut {
+		return printJSON(map[string]any{"ignored": append([]string{}, cfg.Ignored...)})
+	}
+	lang := detectLang(os.Getenv)
+	if len(cfg.Ignored) == 0 {
+		say(lang, "ignoredNone")
+		return nil
+	}
+	var paths []string
+	for _, p := range cfg.Ignored {
+		paths = append(paths, "  "+tildePath(p))
+	}
+	say(lang, "ignored", strings.Join(paths, "\n"))
+	return nil
+}
+
+// registeredAt reports whether a repository at top folder p is registered.
+func registeredAt(repos []Repo, p string) bool {
+	return slices.ContainsFunc(repos, func(r Repo) bool { return filepath.Clean(r.Path) == filepath.Clean(p) })
 }
 
 // ownCommits counts the user's commits in repo over the same range scan reads, and returns the date

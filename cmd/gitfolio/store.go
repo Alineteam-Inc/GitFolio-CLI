@@ -107,10 +107,12 @@ func newRepo(path string) Repo {
 }
 
 type Config struct {
-	Mask   []string `json:"mask,omitempty"`   // blocked words: customer and internal project names
-	Deps   bool     `json:"deps"`             // user allowed dependency detection (DESIGN 3.5)
-	Roots  []string `json:"roots,omitempty"`  // folders where the user keeps repositories (init)
-	APIURL string   `json:"apiUrl,omitempty"` // aline.team API root; empty = production (config api-url)
+	Mask  []string `json:"mask,omitempty"`  // blocked words: customer and internal project names
+	Deps  bool     `json:"deps"`            // user allowed dependency detection (DESIGN 3.5)
+	Roots []string `json:"roots,omitempty"` // folders where the user keeps repositories (init)
+	// Ignored are repositories in those folders status does not offer as new ones (gitfolio ignore).
+	Ignored []string `json:"ignored,omitempty"`
+	APIURL  string   `json:"apiUrl,omitempty"` // aline.team API root; empty = production (config api-url)
 	// AutoSyncOff is local mode: nothing is sent after git push or daily, and a sync sends the
 	// statistics only, no commit records (config autosync).
 	AutoSyncOff bool `json:"autoSyncOff,omitempty"`

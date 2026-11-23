@@ -91,7 +91,8 @@ gitfolio init
 ```
 
 `gitfolio init` shows the data policy and asks you to agree, signs you up or logs you in with a code
-sent to your email, and lets you choose the repositories. It adds git hooks to the chosen repositories,
+sent to your email, and lets you choose the repositories: those with your commits in your code folders,
+listed all chosen, so you leave out what you do not want collected. It adds git hooks to the chosen repositories,
 on this computer only. It then asks what matters before anything happens: what AI coding tools may see
 of the repositories, and whether to sync with aline.team automatically (no means local mode). Your profile on the web is at
 [aline.team/profile](https://aline.team/profile). GitFolio needs git; when it is missing, init offers to
@@ -164,6 +165,8 @@ gitfolio init                    # setup: data policy, sign-up/login, repositori
 gitfolio login | whoami | logout # log in with GitHub or an email code / show the account / log out
 gitfolio email github            # verify your GitHub emails as work emails at once
 gitfolio add | remove <path>     # register a repository / unregister (--purge: delete its data here and on aline.team, web link included)
+gitfolio ignore <path>           # stop offering a repository: status names, once a day, the new ones with your
+                                 # commits in your code folders (nothing is added by itself; --undo offers it again)
 gitfolio list                    # registered repositories, hooks and dependency files
 gitfolio status [name]           # per repository: commits collected and sent, file changes, lines, AI use, languages, dependencies
 gitfolio stats [--refresh]       # your developer type and five scores from aline.team (saved here after the first time;
@@ -289,6 +292,7 @@ gitfolio init
 ```
 
 `gitfolio init`은 데이터 정책을 보여 주고 동의를 받은 뒤, 이메일로 받은 코드로 가입·로그인하고 저장소를 고르게 합니다.
+코드 폴더에서 내 커밋이 있는 저장소를 모두 선택한 채로 보여 주므로, 수집하지 않을 것만 빼면 됩니다.
 고른 저장소에는 git 훅을 이 컴퓨터에만 추가합니다. 그다음 실제로 무언가 하기 전에 중요한 것을 묻습니다. AI 코딩 도구에 저장소를
 어디까지 보일지, aline.team과 자동으로 동기화할지(아니요 = 로컬 모드)입니다. 웹 프로필은
 [aline.team/profile](https://aline.team/profile)에서 봅니다. GitFolio는 git이 필요하며, git이 없으면 init이 시스템 설치
@@ -348,6 +352,8 @@ gitfolio init                    # 설정: 데이터 정책, 가입·로그인, 
 gitfolio login | whoami | logout # GitHub 또는 이메일 코드로 로그인 / 계정 확인 / 로그아웃
 gitfolio email github            # GitHub 이메일을 작업 이메일로 한 번에 인증
 gitfolio add | remove <경로>     # 저장소 등록 / 해제 (--purge: 이 컴퓨터와 aline.team의 데이터·웹 연동 삭제)
+gitfolio ignore <경로>           # 저장소를 더 권하지 않음: status가 하루 한 번 코드 폴더에서 내 커밋이 있는
+                                 # 새 저장소를 알려 줌 (저절로 추가하지 않음, --undo는 다시 권함)
 gitfolio list                    # 등록 저장소, 훅, 의존성 파일
 gitfolio status [이름]           # 저장소별 모은 커밋·보낸 수, 파일 변경, 줄 수, AI 사용, 언어, 의존성
 gitfolio stats [--refresh]       # aline.team의 개발자 유형과 능력치 다섯 가지 (처음 받은 뒤 이 컴퓨터에 저장.

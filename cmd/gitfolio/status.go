@@ -259,6 +259,13 @@ func cmdStatus(dir string, args []string) error {
 		return err
 	}
 	waitingNotice(lang, c, st.Waiting)
+	if found := newRepos(dir, cfg, repos); len(found) > 0 {
+		var paths []string
+		for _, r := range found {
+			paths = append(paths, tildePath(r.Path))
+		}
+		notice(fmt.Sprintf(tr(lang, "newRepos"), len(found), strings.Join(paths, ", ")))
+	}
 	notice(tr(lang, "statusMore"))
 	return nil
 }
@@ -298,7 +305,7 @@ func statusJSON(dir string, repos []Repo, commits []Commit, st syncState, cfg Co
 		account = c.creds.Email
 	}
 	// In local mode commits are never sent: unsent only counts in automatic mode.
-	res := map[string]any{"account": account, "setUp": c.loggedIn() && len(repos) > 0, "syncMode": syncMode(cfg),
+	res := map[string]any{"account": account, "setUp": c.loggedIn() && len(repos) > 0, "syncMode": syncMode(cfg), "newRepositories": newRepos(dir, cfg, repos),
 		"lastSync": st.LastSync, "lastSyncError": st.LastError, "unsent": unsent, "repositories": list, "waiting": c.waitingJSON(waiting)}
 	maps.Copy(res, versions(dir))
 	return printJSON(res)

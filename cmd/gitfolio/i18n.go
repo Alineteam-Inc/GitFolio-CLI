@@ -727,9 +727,9 @@ var messages = map[string]map[string]string{
 		"ja": "上記はあなたのコミットがあるリポジトリです。(コミット数、最新コミット日)\nコミットメッセージ内の顧客名や社内プロジェクト名は `gitfolio config mask add <単語>` で隠せます。\n",
 	},
 	"selectRepos": {
-		"en": "Which repositories should GitFolio collect? [all / 1,3,5-7 / Enter = none] > ",
-		"ko": "어느 저장소를 수집할까요? [all / 1,3,5-7 / Enter = 선택 안 함] > ",
-		"ja": "どのリポジトリを収集しますか? [all / 1,3,5-7 / Enter = 選択しない] > ",
+		"en": "Which repositories should GitFolio collect? [Enter = all / 1,3,5-7 / none] > ",
+		"ko": "어느 저장소를 수집할까요? [Enter = 모두 / 1,3,5-7 / none] > ",
+		"ja": "どのリポジトリを収集しますか? [Enter = すべて / 1,3,5-7 / none] > ",
 	},
 	"chooseLater": {
 		"en": "Run `gitfolio init` in a terminal to choose, or `gitfolio add <path>` for one repository.\n",
@@ -1071,6 +1071,21 @@ var messages = map[string]map[string]string{
 		"en": "aline.team is still making your developer type. It keeps it when done; run `gitfolio stats` again in a minute.\n",
 		"ko": "aline.team이 아직 개발자 유형을 만드는 중입니다. 다 만들면 aline.team에 저장되니 잠시 뒤 `gitfolio stats`를 다시 실행하세요.\n",
 		"ja": "aline.team はまだ開発者タイプを作成中です。完成すると aline.team に保存されるので、少し待ってからもう一度 `gitfolio stats` を実行してください。\n",
+	},
+	"newRepos": {
+		"en": "%d more repositories with your commits are in your folders: %s\n  Collect one with `gitfolio add <path>`, or stop offering it with `gitfolio ignore <path>`.\n",
+		"ko": "등록 폴더에 내 커밋이 있는 저장소가 %d개 더 있습니다: %s\n  수집하려면 `gitfolio add <경로>`, 더 권하지 않으려면 `gitfolio ignore <경로>`.\n",
+		"ja": "登録フォルダに自分のコミットがあるリポジトリがあと %d 件あります: %s\n  収集するには `gitfolio add <パス>`、勧めないようにするには `gitfolio ignore <パス>`。\n",
+	},
+	"ignored": {
+		"en": "Not offered as new repositories:\n%s\n",
+		"ko": "새 저장소로 권하지 않는 저장소:\n%s\n",
+		"ja": "新しいリポジトリとして勧めないもの:\n%s\n",
+	},
+	"ignoredNone": {
+		"en": "No repository is ignored: status offers every new one with your commits in your folders.\n",
+		"ko": "무시하는 저장소가 없습니다: 등록 폴더에서 내 커밋이 있는 새 저장소는 모두 status가 권합니다.\n",
+		"ja": "無視しているリポジトリはありません: 登録フォルダで自分のコミットがある新しいリポジトリは status がすべて勧めます。\n",
 	},
 	"statusMore": {
 		"en": "One repository in full: gitfolio status <name>\n",

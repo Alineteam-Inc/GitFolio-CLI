@@ -16,6 +16,86 @@ import (
 	"testing"
 )
 
+// status offers, once a day, the repositories with the user's commits in init's folders that are not
+// registered nor ignored; nothing is added by itself. init lists them all chosen.
+func TestNewRepositories(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GITFOLIO_LANG", "en")
+	dir, root := t.TempDir(), t.TempDir()
+	repo := func(name, email string) string {
+		p := filepath.Join(root, name)
+		for _, args := range [][]string{{"init", "-q", p}, {"-C", p, "-c", "user.name=x", "-c", "user.email=" + email, "commit", "-q", "--allow-empty", "-m", "feat: x"}} {
+			if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+				t.Fatalf("git %v: %v\n%s", args, err, out)
+			}
+		}
+		top, _ := topLevel(p)
+		return top
+	}
+	reg, fresh, ign := repo("registered", "me@example.com"), repo("fresh", "me@example.com"), repo("ignored", "me@example.com")
+	repo("theirs", "other@example.com")
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(saveConfig(dir, Config{Roots: []string{root}, Emails: []string{"me@example.com"}}))
+	must(saveRepos(dir, []Repo{newRepo(reg)}))
+	paths := func() []string {
+		t.Helper()
+		cfg, _ := loadConfig(dir)
+		repos, _ := loadRepos(dir)
+		var ps []string
+		for _, r := range newRepos(dir, cfg, repos) {
+			ps = append(ps, r.Path)
+		}
+		slices.Sort(ps)
+		return ps
+	}
+	defer func(o io.Writer) { out, jsonOut = o, false }(out)
+	out = io.Discard
+	lookForRepos(dir)
+	if got, want := paths(), []string{fresh, ign}; !slices.Equal(got, want) {
+		t.Errorf("new = %q, want %q", got, want)
+	}
+	must(cmdIgnore(dir, []string{ign}))
+	if got := paths(); !slices.Equal(got, []string{fresh}) {
+		t.Errorf("after ignore: %q", got)
+	}
+	later := repo("later", "me@example.com")
+	lookForRepos(dir) // looked today already: not again
+	if got := paths(); !slices.Equal(got, []string{fresh}) {
+		t.Errorf("looked again within the day: %q", got)
+	}
+	must(saveJSON(filepath.Join(dir, foundFile), foundState{})) // a day later
+	lookForRepos(dir)
+	if got := paths(); !slices.Equal(got, []string{fresh, later}) {
+		t.Errorf("a day later: %q", got)
+	}
+	v, err := jsonStdout(t, func() error { return cmdStatus(dir, []string{"--json"}) })
+	if list, _ := v["newRepositories"].([]any); err != nil || len(list) != 2 {
+		t.Errorf("status --json newRepositories = %v, %v", v["newRepositories"], err)
+	}
+	must(cmdIgnore(dir, []string{ign, "--undo"}))
+	if got := paths(); len(got) != 3 {
+		t.Errorf("after --undo: %q", got)
+	}
+	if err := cmdIgnore(dir, []string{"--undo"}); errorCode(err) != "usage" {
+		t.Errorf("ignore --undo without a path: %v", err)
+	}
+	// init lists the user's repositories chosen: Enter takes them all, none takes none.
+	defer func(i func() bool, r *bufio.Reader) { interactive, stdin = i, r }(interactive, stdin)
+	interactive = func() bool { return true }
+	for answer, want := range map[string]int{"\n": 2, "none\n": 0} {
+		stdin = bufio.NewReader(strings.NewReader(answer))
+		if chosen, err := chooseRepos("en", dir, []string{fresh, later}, []string{"me@example.com"}); err != nil || len(chosen) != want {
+			t.Errorf("answer %q: chose %q, %v", answer, chosen, err)
+		}
+	}
+}
+
 func TestDetectLang(t *testing.T) {
 	defer func(f func() []string) { osLanguages = f }(osLanguages)
 	for _, tc := range []struct {
