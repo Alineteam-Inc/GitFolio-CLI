@@ -478,6 +478,15 @@ func TestMCPStatusMasksSyncError(t *testing.T) {
 	if err != nil || strings.Contains(got, "secret-proj") || !strings.Contains(got, "[URL]") || !strings.Contains(got, "no such host") {
 		t.Errorf("lastSyncError = %q, %v", got, err)
 	}
+	// A file that failed names its path, the home folder (the user's name) in it.
+	home, _ := os.UserHomeDir()
+	if err := saveSync(dir, syncState{LastError: "open " + filepath.Join(home, "data", "sync.json") + ": permission denied"}); err != nil {
+		t.Fatal(err)
+	}
+	v, err = mcpStatus(dir, nil)
+	if got := fmt.Sprint(v.(map[string]any)["lastSyncError"]); err != nil || home == "" || strings.Contains(got, home) || !strings.HasPrefix(got, "open ~") {
+		t.Errorf("lastSyncError = %q, %v", got, err)
+	}
 }
 
 // From an AI tool, GitHub is a start and checks: the code to show, pending until the user approves, then
