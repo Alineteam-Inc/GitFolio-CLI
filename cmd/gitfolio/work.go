@@ -536,7 +536,7 @@ func mcpCommits(dir string, args map[string]any) (any, error) {
 	kind, _ := args["type"].(string)
 	limit, offset := 100, 0
 	if v, ok := args["limit"].(float64); ok {
-		limit = min(max(int(v), 1), 500)
+		limit = int(min(max(v, 1), 500)) // clamped as a float, as offset is
 	}
 	if v, ok := args["offset"].(float64); ok {
 		offset = int(min(max(v, 0), 1<<31)) // clamped as a float: a huge one would wrap round as an int

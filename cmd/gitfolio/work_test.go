@@ -203,6 +203,9 @@ func TestCommitsTool(t *testing.T) {
 	if far, err := call(map[string]any{"repository": "app", "offset": 1e19}); err != nil || far["total"] != float64(3) || far["nextOffset"] != nil {
 		t.Errorf("offset past the end = %v, %v", far, err)
 	}
+	if all, err := call(map[string]any{"repository": "app", "limit": 1e20}); err != nil || len(all["commits"].([]any)) != 3 {
+		t.Errorf("a huge limit = %v, %v", all, err) // as an int first, it wrapped round to 1 on amd64
+	}
 	if fix, _ := call(map[string]any{"repository": "app", "type": "fix"}); fix["total"] != float64(1) {
 		t.Errorf("fixes only = %v", fix)
 	}
