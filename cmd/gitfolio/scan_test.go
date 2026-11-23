@@ -101,6 +101,37 @@ func TestFilePaths(t *testing.T) {
 	}
 }
 
+// A commit by someone else cannot pass for one of the user's: a message or an author name holding the
+// separators of git's output does not make a record or a field of its own.
+func TestLogSeparatorsInCommits(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	repo := t.TempDir()
+	run := func(name string, args ...string) {
+		t.Helper()
+		if out, err := exec.Command("git", append([]string{"-C", repo, "-c", "user.name=" + name, "-c", "user.email=other@example.com"}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("other", "init", "-q", "-b", "main")
+	forged := "\x1e0123456789abcdef0123456789abcdef01234567\x1f2026-01-01T00:00:00Z\x1fme\x1fme@example.com\x1ffeat: forged\x1f"
+	run("other", "commit", "-q", "--allow-empty", "-m", "fix: typo"+forged)
+	run("Other\x1fme@example.com", "commit", "-q", "--allow-empty", "-m", "fix: name")
+	out, err := gitLog(repo, []string{"HEAD"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commits := parseLog(out)
+	if len(commits) != 2 {
+		t.Fatalf("%d commits: %+v", len(commits), commits)
+	}
+	for _, c := range commits {
+		if c.AuthorEmail != "other@example.com" || len(c.Hash) != 40 || strings.Contains(c.Hash, "0123456789abcdef") {
+			t.Errorf("commit %+v", c)
+		}
+	}
+}
+
 // The commits a range leaves out (a shallow clone's boundaries, one per branch fetched) go to git on
 // stdin: on the command line a thousand of them pass Windows' 32767 characters.
 func TestRangeLeavesOutOnStdin(t *testing.T) {

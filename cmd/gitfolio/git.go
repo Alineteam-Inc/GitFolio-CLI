@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"net/url"
@@ -17,8 +18,16 @@ import (
 	"time"
 )
 
-// logFormat separates commits with \x1e and fields with \x1f; numstat lines follow the last \x1f.
-const logFormat = "--format=%x1e%H%x1f%aI%x1f%aN%x1f%aE%x1f%B%x1f"
+// logMark follows each separator of logFormat. It is new for each run, so a commit message or author
+// name holding the separators cannot start a commit or a field of its own: someone else's commit
+// passing for the user's.
+var logMark = rand.Text()[:10]
+
+// logSep and fieldSep start each commit and end each field in logFormat; numstat lines follow the last
+// field.
+var logSep, fieldSep = "\x1e" + logMark, "\x1f" + logMark
+
+var logFormat = "--format=%x1e" + logMark + strings.Join([]string{"%H", "%aI", "%aN", "%aE", "%B", ""}, "%x1f"+logMark)
 
 // gitPath is the git that git() runs: the one on the PATH, or the Command Line Tools' own (gitWorks).
 var gitPath = "git"
@@ -636,8 +645,8 @@ func fileStats(repo string, hashes []string) (map[string][]FileStat, error) {
 
 func parseLog(out string) []Commit {
 	var commits []Commit
-	for _, rec := range strings.Split(out, "\x1e") {
-		f := strings.SplitN(rec, "\x1f", 6)
+	for _, rec := range strings.Split(out, logSep) {
+		f := strings.SplitN(rec, fieldSep, 6)
 		if len(f) < 6 {
 			continue
 		}
