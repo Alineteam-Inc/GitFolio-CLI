@@ -60,7 +60,7 @@ func trimHistory(p string, max int64) {
 		return
 	}
 	b, err := os.ReadFile(p)
-	if err != nil {
+	if err != nil || int64(len(b)) <= max { // another run trimmed it since the Stat
 		return
 	}
 	b = b[int64(len(b))-max*3/4:]
