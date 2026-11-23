@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"io"
 	"maps"
 	"os"
 	"os/exec"
@@ -49,6 +50,27 @@ func TestParseManifest(t *testing.T) {
 		if s := strings.Join(got, " "); s != tc.want {
 			t.Errorf("%s:\n got  %s\n want %s", tc.file, s, tc.want)
 		}
+	}
+}
+
+// Repositories whose file choices changed together have their stored commits put in their new modules
+// in one write; other repositories' commits stay as they are.
+func TestRescanDepsTogether(t *testing.T) {
+	defer func(o io.Writer) { out = o }(out)
+	out = io.Discard
+	dir := t.TempDir()
+	rs := []Repo{{ID: "r1", Path: t.TempDir(), Manifests: map[string]bool{"api/go.mod": true}},
+		{ID: "r2", Path: t.TempDir(), Manifests: map[string]bool{"web/package.json": true}}}
+	if err := writeCommits(dir, []Commit{{Repo: "r1", Hash: "a", Files: []FileStat{{Name: "api/main.go"}}},
+		{Repo: "r2", Hash: "b", Files: []FileStat{{Name: "web/app.js"}}}, {Repo: "r3", Hash: "c", Files: []FileStat{{Name: "api/x.go", Module: "kept"}}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := rescanDeps(dir, &rs[0], &rs[1]); err != nil {
+		t.Fatal(err)
+	}
+	commits, _ := readCommits(dir)
+	if len(commits) != 3 || commits[0].Files[0].Module != moduleID("api") || commits[1].Files[0].Module != moduleID("web") || commits[2].Files[0].Module != "kept" {
+		t.Errorf("commits = %+v", commits)
 	}
 }
 

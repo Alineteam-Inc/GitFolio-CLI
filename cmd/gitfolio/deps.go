@@ -1085,37 +1085,46 @@ func changeDeps(dir string, args []string) error {
 // reviewAndRescan asks about the manifest files of rs in one list and updates the repositories whose
 // decisions changed, so dependencies and module IDs match the new approvals.
 func reviewAndRescan(dir string, rs []Repo) error {
+	var changed []*Repo
 	for _, i := range reviewManifests(rs) {
-		if err := rescanDeps(dir, &rs[i]); err != nil {
-			return err
-		}
+		changed = append(changed, &rs[i])
 	}
-	return nil
+	return rescanDeps(dir, changed...)
 }
 
-// rescanDeps puts r's stored commits in the modules of its new decisions and reads the approved files.
-// The module of a file depends only on its path, which is stored as is: git history is not read again.
-func rescanDeps(dir string, r *Repo) error {
+// rescanDeps puts the stored commits of rs in the modules of their new decisions and reads the approved
+// files. The module of a file depends only on its path, which is stored as is: git history is not read
+// again, and the commits are written once for all of rs.
+func rescanDeps(dir string, rs ...*Repo) error {
+	if len(rs) == 0 {
+		return nil
+	}
 	commits, err := readCommits(dir)
 	if err != nil {
 		return err
 	}
-	modules, n := manifestModules(*r), 0
+	modules, n := map[string]map[string]string{}, map[string]int{}
+	for _, r := range rs {
+		modules[r.ID] = manifestModules(*r)
+	}
 	for _, c := range commits {
-		if c.Repo != r.ID {
+		m, ok := modules[c.Repo]
+		if !ok {
 			continue
 		}
-		n++
+		n[c.Repo]++
 		for i := range c.Files {
-			c.Files[i].Module = moduleOf(c.Files[i].Name, modules)
+			c.Files[i].Module = moduleOf(c.Files[i].Name, m)
 		}
 	}
 	if err := writeCommits(dir, commits); err != nil {
 		return err
 	}
-	if _, _, err := refreshDeps(dir, r); err != nil { // the files were just approved for this
-		return err
+	for _, r := range rs {
+		if _, _, err := refreshDeps(dir, r); err != nil { // the files were just approved for this
+			return err
+		}
+		say(detectLang(os.Getenv), "depsUpdated", r.Name, n[r.ID])
 	}
-	say(detectLang(os.Getenv), "depsUpdated", r.Name, n)
 	return nil
 }
