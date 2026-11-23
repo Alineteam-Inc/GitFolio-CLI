@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -295,6 +296,25 @@ func TestEmailVerifyWaitsOutsideLock(t *testing.T) {
 	}
 	if cfg, _ := loadConfig(dir); !asked || held || !slices.Contains(cfg.Emails, "work@example.com") {
 		t.Errorf("asked %v, lock held meanwhile %v; emails %v", asked, held, cfg.Emails)
+	}
+}
+
+// Every command the usage names runs: one missing from commands stops as unknownCommand before its case
+// (ignore did). ignore runs through run as the app calls it.
+func TestUsageCommandsRun(t *testing.T) {
+	for _, m := range regexp.MustCompile(`(?m)^  ([a-z]+)\b`).FindAllStringSubmatch(usage, -1) {
+		if !slices.Contains(commands, m[1]) {
+			t.Errorf("usage names %q, which commands lacks", m[1])
+		}
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("AppData", filepath.Join(home, "AppData"))
+	defer func() { jsonOut = false }()
+	v, err := jsonStdout(t, func() error { return run([]string{"ignore", filepath.Join(home, "gone"), "--json"}) })
+	if list, _ := v["ignored"].([]any); err != nil || len(list) != 1 {
+		t.Errorf("ignore through run: %v %v", v, err)
 	}
 }
 

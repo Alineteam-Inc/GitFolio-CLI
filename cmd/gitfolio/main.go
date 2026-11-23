@@ -353,7 +353,7 @@ func run(args []string) error {
 }
 
 // commands are the commands people type; "hook" is run by git hooks only and never suggested.
-var commands = []string{"init", "login", "logout", "whoami", "add", "remove", "scan", "sync", "list", "status",
+var commands = []string{"init", "login", "logout", "whoami", "add", "remove", "ignore", "scan", "sync", "list", "status",
 	"stats", "stack", "work", "portfolio", "mcp", "export", "config", "deps", "schedule", "email", "history", "update", "uninstall", "git", "version", "help"}
 
 // unknownCommand names the commands the user may have meant (similarCommands), or points to help.
