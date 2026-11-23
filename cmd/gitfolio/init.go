@@ -715,12 +715,16 @@ func lookForRepos(dir string) {
 	}
 	cfg, err := loadConfig(dir)
 	repos, rerr := loadRepos(dir)
-	if err != nil || rerr != nil || len(cfg.Roots) == 0 {
+	roots := cfg.Roots
+	if home, herr := os.UserHomeDir(); len(roots) == 0 && herr == nil {
+		roots = suggestRoots(home) // set up with the folders init --scan suggested, which it keeps no list of
+	}
+	if err != nil || rerr != nil || len(roots) == 0 {
 		return
 	}
 	st.CheckedAt = time.Now()
 	_ = saveJSON(p, st) // first: status runs at the same time (an app starting asks a few) do not look too
-	found := slices.DeleteFunc(findRepos(cfg.Roots, 5), func(p string) bool { return registeredAt(repos, p) })
+	found := slices.DeleteFunc(findRepos(roots, 5), func(p string) bool { return registeredAt(repos, p) })
 	list := make([]foundRepo, len(found))
 	sideBySide(len(found), func(i int) {
 		n, last := ownCommits(found[i], cfg.Emails)

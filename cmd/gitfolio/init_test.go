@@ -94,6 +94,18 @@ func TestNewRepositories(t *testing.T) {
 			t.Errorf("answer %q: chose %q, %v", answer, chosen, err)
 		}
 	}
+	// Set up by the app with the folders init --scan suggested, which keeps no folder: those are looked in.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	must(os.Rename(root, filepath.Join(home, "code")))
+	must(saveConfig(dir, Config{Emails: []string{"me@example.com"}}))
+	must(saveRepos(dir, nil))
+	must(saveJSON(filepath.Join(dir, foundFile), foundState{}))
+	lookForRepos(dir)
+	if cfg, _ := loadConfig(dir); len(newRepos(dir, cfg, nil)) != 4 {
+		t.Errorf("in the suggested folders: %+v", newRepos(dir, cfg, nil))
+	}
 }
 
 func TestDetectLang(t *testing.T) {
