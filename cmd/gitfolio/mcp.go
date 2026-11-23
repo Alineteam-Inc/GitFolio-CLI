@@ -705,7 +705,7 @@ func mcpSetExposure(dir string, args map[string]any) (any, error) {
 		}
 		for _, key := range []string{"name", "messages", "branches", "hidden"} {
 			v, ok := args[key]
-			if !ok {
+			if !ok || v == nil { // null: not set, which some clients send for every field
 				continue
 			}
 			if !setExposure(&repos[i].AI, key, fmt.Sprint(v)) {

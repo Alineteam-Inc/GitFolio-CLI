@@ -234,6 +234,13 @@ func TestAIExposure(t *testing.T) {
 	if _, err := mcpWork(dir, map[string]any{"repository": "Payments backend"}); err != nil {
 		t.Errorf("by the name AI tools see: %v", err)
 	}
+	// A setting sent as null (some clients send unset fields so) changes nothing.
+	if _, err := mcpSetExposure(dir, map[string]any{"repository": "side", "name": nil, "messages": nil}); err != nil {
+		t.Errorf("null settings: %v", err)
+	}
+	if repos, _ := loadRepos(dir); repos[2].AI.Name != "" || repos[2].AI.Messages != "subjects" {
+		t.Errorf("null settings changed side: %+v", repos[2].AI)
+	}
 
 	in := strings.Join([]string{
 		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"set_ai_exposure","arguments":{"repository":"internal-tool","name":"anonymous","branches":false}}}`,
