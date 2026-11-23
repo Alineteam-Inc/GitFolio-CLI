@@ -160,6 +160,20 @@ func TestPortfolio(t *testing.T) {
 	if left, _ := filepath.Glob(filepath.Join(work, "portfolio.md.*")); len(left) > 0 {
 		t.Errorf("left behind: %v", left)
 	}
+	if runtime.GOOS != "windows" { // a link is written through, and a file written over keeps its mode
+		must(os.WriteFile(filepath.Join(work, "mine.md"), []byte("edited"), 0o600))
+		must(os.Symlink(filepath.Join(work, "mine.md"), filepath.Join(work, "link.md")))
+		must(cmdPortfolio(dir, []string{"link.md", "--replace"}))
+		if fi, err := os.Lstat(filepath.Join(work, "link.md")); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+			t.Errorf("the link was replaced: %v %v", fi, err)
+		}
+		if md, err := os.ReadFile(filepath.Join(work, "mine.md")); err != nil || !strings.Contains(string(md), "**KEEPER**") {
+			t.Errorf("mine.md through the link:\n%s", md)
+		}
+		if fi, _ := os.Stat(filepath.Join(work, "mine.md")); fi.Mode().Perm() != 0o600 {
+			t.Errorf("mine.md mode %v", fi.Mode())
+		}
+	}
 	// For a program: the Markdown itself without a file, else the file written; and what is missing.
 	v, err := jsonStdout(t, func() error { return cmdPortfolio(dir, []string{"--json"}) })
 	if missing, _ := v["missing"].([]any); err != nil || !strings.Contains(fmt.Sprint(v["markdown"]), "**KEEPER**") || missing == nil || len(missing) != 0 {

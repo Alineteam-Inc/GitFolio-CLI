@@ -67,6 +67,10 @@ func cmdPortfolio(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
+	dest := out
+	if real, err := filepath.EvalSymlinks(out); err == nil {
+		dest = real // a link: the file it points to is written, not the link replaced
+	}
 	if _, err := os.Stat(out); err == nil && !replace { // never over an edited portfolio unasked
 		if !interactive() {
 			return failure("portfolioExists", tildePath(out))
@@ -91,9 +95,15 @@ func cmdPortfolio(dir string, args []string) error {
 	format, saved := "md", "portfolioSaved"
 	if pdf {
 		format, saved = "pdf", "portfolioSavedPDF"
-		err = printPDF(portfolioPage(lang, md, base), out)
-	} else if err = writeFile(out, []byte(md)); err == nil { // in one step, as the PDF: one that fails leaves the old file
-		err = os.Chmod(out, 0o644)
+		err = printPDF(portfolioPage(lang, md, base), dest)
+	} else {
+		mode := os.FileMode(0o644)
+		if st, err := os.Stat(dest); err == nil {
+			mode = st.Mode().Perm() // one written over keeps who may read it
+		}
+		if err = writeFile(dest, []byte(md)); err == nil { // in one step, as the PDF: one that fails leaves the old file
+			err = os.Chmod(dest, mode)
+		}
 	}
 	if err != nil {
 		return err
