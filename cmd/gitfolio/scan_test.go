@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
@@ -602,6 +603,22 @@ func TestTornCommitLineSkipped(t *testing.T) {
 	f.Close()
 	if commits, err := readCommits(dir); err != nil || len(commits) != 1 || commits[0].Hash != "a1" {
 		t.Errorf("read with a torn last line: %+v, %v", commits, err)
+	}
+}
+
+// A commit line of any length is read (a vendored folder committed whole lists hundreds of thousands of
+// files: here about 19 MB); a line over a reader's limit used to stop every command.
+func TestLongCommitLineRead(t *testing.T) {
+	dir := t.TempDir()
+	files := make([]FileStat, 300_000)
+	for i := range files {
+		files[i] = FileStat{Name: fmt.Sprintf("vendor/node_modules/package-%06d/index.js", i), Add: 1}
+	}
+	if err := writeCommits(dir, []Commit{{Repo: "a", Hash: "a1", Files: files}, {Repo: "a", Hash: "a2"}}); err != nil {
+		t.Fatal(err)
+	}
+	if commits, err := readCommits(dir); err != nil || len(commits) != 2 || len(commits[0].Files) != len(files) {
+		t.Errorf("read %d commits, %v", len(commits), err)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/fs"
 	"maps"
 	"os"
@@ -249,15 +250,20 @@ func decodeJSONL[T any](p string, each func(T)) error {
 		return err
 	}
 	defer f.Close()
-	sc := bufio.NewScanner(f)
-	sc.Buffer(nil, 16<<20) // long commit messages
-	for sc.Scan() {
+	r := bufio.NewReaderSize(f, 1<<20) // lines of any length: a commit can list hundreds of thousands of files
+	for {
+		line, err := r.ReadBytes('\n')
 		var v T
-		if json.Unmarshal(sc.Bytes(), &v) == nil {
+		if len(line) > 0 && json.Unmarshal(line, &v) == nil {
 			each(v)
 		}
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
 	}
-	return sc.Err()
 }
 
 func encodeJSONL[T any](p string, flag int, items []T) error {
