@@ -36,13 +36,13 @@ func TestTaskSchedulerWindows(t *testing.T) {
 			t.Errorf("registered task lacks %q:\n%s", want, x)
 		}
 	}
-	if err := unschedule(dir); err != nil {
+	if err := unschedule(); err != nil {
 		t.Fatal(err)
 	}
 	if exec.Command("schtasks", "/Query", "/TN", winTaskName).Run() == nil {
 		t.Error("task still registered after unschedule")
 	}
-	if err := unschedule(dir); err != nil { // nothing registered: not an error
+	if err := unschedule(); err != nil { // nothing registered: not an error
 		t.Error(err)
 	}
 }

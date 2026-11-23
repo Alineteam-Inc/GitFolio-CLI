@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 )
 
 // cmdMCP serves GitFolio to AI coding tools (Claude Code, Codex and others) as an MCP server: JSON-RPC
@@ -439,12 +438,6 @@ func mcpStatus(dir string, _ map[string]any) (any, error) {
 		Waiting      bool           `json:"waitingForVerifiedEmail,omitempty"` // which email: gitfolio email
 		Hooks        string         `json:"hooks"`                             // on, off, or manual: pushes are not collected unless on
 	}
-	day := func(t time.Time) string {
-		if t.IsZero() {
-			return ""
-		}
-		return t.Local().Format(time.DateOnly)
-	}
 	seen := map[string]Repo{}
 	for _, v := range aiView(detectLang(os.Getenv), repos) {
 		seen[v.ID] = v
@@ -459,11 +452,7 @@ func mcpStatus(dir string, _ map[string]any) (any, error) {
 		}
 		s := statusOf(r, commits, nil, st)
 		list = append(list, repo{v.Name, providerNames[r.Provider], v.Namespace, s.commits, s.sentCount(r, st), s.changes,
-			s.add, s.del, s.created, s.aiShare(), s.lines, day(s.first), day(s.last), st.Waiting[r.Provider+"/"+r.Namespace] != "", hooks[i]})
-	}
-	mode := "automatic"
-	if cfg.AutoSyncOff {
-		mode = "local"
+			s.add, s.del, s.created, s.aiShare(), s.lines, localDay(s.first), localDay(s.last), st.Waiting[r.Provider+"/"+r.Namespace] != "", hooks[i]})
 	}
 	c, err := newClient(dir)
 	if err != nil {
@@ -471,7 +460,7 @@ func mcpStatus(dir string, _ map[string]any) (any, error) {
 	}
 	// The error masked as commit messages are: a failed request names its URL, the address of a repository
 	// that may be hidden from AI tools.
-	res := map[string]any{"loggedIn": c.loggedIn(), "repositories": list, "syncMode": mode, "lastSync": st.LastSync,
+	res := map[string]any{"loggedIn": c.loggedIn(), "repositories": list, "syncMode": syncMode(cfg), "lastSync": st.LastSync,
 		"lastSyncError": newMasker(cfg.Mask).apply(st.LastError)}
 	maps.Copy(res, versions(dir))
 	return res, nil
@@ -796,6 +785,10 @@ func mcpLoginStart(dir string, args map[string]any) (any, error) {
 	return res, nil
 }
 
+// mcpAfterLogin is what an AI tool does next once the user is logged in.
+const mcpAfterLogin = "Register the user's repositories with add_repository, choose the sync mode with set_sync_mode, " +
+	"and agree with the user what AI tools may see of each repository (set_ai_exposure)."
+
 func mcpLoginVerify(dir string, args map[string]any) (any, error) {
 	email, _ := args["email"].(string)
 	code, _ := args["code"].(string)
@@ -822,9 +815,7 @@ func mcpLoginVerify(dir string, args map[string]any) (any, error) {
 	case err != nil:
 		return nil, err
 	}
-	r := map[string]any{"loggedIn": true, "newAccount": res.Account.Created,
-		"next": "Register the user's repositories with add_repository, choose the sync mode with set_sync_mode, and agree with " +
-			"the user what AI tools may see of each repository (set_ai_exposure)."}
+	r := map[string]any{"loggedIn": true, "newAccount": res.Account.Created, "next": mcpAfterLogin}
 	if res.Account.Created {
 		r["webLogin"] = strings.TrimSpace(tr(lang, "passwordMail"))
 	}
@@ -927,8 +918,7 @@ func mcpGithubCheck(dir string, _ map[string]any) (any, error) {
 			return nil, err
 		}
 		return map[string]any{"loggedIn": true, "email": res.Account.Email, "newAccount": res.Account.Created, "github": gh,
-			"next": "Register the user's repositories with add_repository, choose the sync mode with set_sync_mode, and agree " +
-				"with the user what AI tools may see of each repository (set_ai_exposure)."}, nil
+			"next": mcpAfterLogin}, nil
 	}
 	return nil, errors.New("no GitHub login or connection is under way: call login_github or connect_github first")
 }

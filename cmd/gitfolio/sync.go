@@ -113,19 +113,17 @@ const (
 
 func loadSync(dir string) (st syncState, err error) {
 	err = loadJSON(filepath.Join(dir, syncStateFile), &st)
-	if st.Commits == nil {
-		st.Commits = map[string]string{}
-	}
-	if st.Changed == nil {
-		st.Changed = map[string]string{}
-	}
-	if st.Deps == nil {
-		st.Deps = map[string]string{}
-	}
-	if st.Stats == nil {
-		st.Stats = map[string]string{}
-	}
+	st.makeMaps()
 	return st, err
+}
+
+// makeMaps makes the records of what was sent that are still nil, so they can be written to.
+func (st *syncState) makeMaps() {
+	for _, m := range []*map[string]string{&st.Commits, &st.Changed, &st.Deps, &st.Stats} {
+		if *m == nil {
+			*m = map[string]string{}
+		}
+	}
 }
 
 func saveSync(dir string, st syncState) error { return saveJSON(filepath.Join(dir, syncStateFile), st) }
@@ -392,7 +390,8 @@ func sendPending(dir string, dryRun bool) (n syncCounts, err error) {
 	}
 	if st.Account != c.creds.Email || st.Server != c.creds.Server {
 		if st.Account != "" { // another account or server: it has none of this device's records yet
-			st = syncState{Commits: map[string]string{}, Changed: map[string]string{}, Deps: map[string]string{}, Stats: map[string]string{}}
+			st = syncState{}
+			st.makeMaps()
 		}
 		st.Account, st.Server = c.creds.Email, c.creds.Server
 	}

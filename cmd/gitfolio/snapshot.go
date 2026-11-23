@@ -147,10 +147,7 @@ var substantive = map[string]bool{"ADD": true, "FIX": true, "HOTFIX": true, "PER
 // commits and what the last scan counted of others (Repo.Churn). Repositories go by ID, and a commit
 // that is also in one before by its author time counts as dup, so the account's commits count once.
 func snapshots(repos []Repo, commits []Commit, author string) []snapshot {
-	byRepo := map[string][]Commit{}
-	for _, c := range commits {
-		byRepo[c.Repo] = append(byRepo[c.Repo], c)
-	}
+	byRepo := commitsByRepo(commits)
 	repos = slices.SortedFunc(slices.Values(repos), func(a, b Repo) int { return cmp.Compare(a.ID, b.ID) })
 	owner := map[int64]bool{} // author times of commits counted in a repository before
 	out := []snapshot{}

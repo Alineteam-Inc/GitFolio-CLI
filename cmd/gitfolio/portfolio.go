@@ -137,16 +137,8 @@ func portfolioOf(dir, lang string, ai bool) (md string, missing []string, err er
 	if err != nil {
 		return "", nil, err
 	}
-	var repos []Repo
-	var commits []Commit
-	if err := withLock(dir, func() error { // a push may be writing them
-		var err error
-		if repos, err = loadRepos(dir); err != nil {
-			return err
-		}
-		commits, err = readCommits(dir)
-		return err
-	}); err != nil {
+	repos, commits, err := loadRepoCommits(dir)
+	if err != nil {
 		return "", nil, err
 	}
 	if ai {

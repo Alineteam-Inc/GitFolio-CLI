@@ -603,7 +603,7 @@ func cmdRemove(dir string, args []string) error {
 	}
 	if len(repos) == 0 { // nothing left to sync: the daily sync goes too
 		if cfg, err := loadConfig(dir); err == nil && cfg.Schedule != "" {
-			if err := unschedule(dir); err != nil {
+			if err := unschedule(); err != nil {
 				return err
 			}
 			cfg.Schedule = ""
@@ -672,7 +672,7 @@ func cmdUninstall(dir string, args []string) error {
 		if cfg, err := loadConfig(dir); err != nil {
 			return err
 		} else if cfg.Schedule != "" {
-			if err := unschedule(dir); err != nil {
+			if err := unschedule(); err != nil {
 				return err
 			}
 			cfg.Schedule = ""

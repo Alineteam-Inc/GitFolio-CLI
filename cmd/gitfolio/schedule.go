@@ -103,7 +103,7 @@ func setSchedule(dir, lang, when string) error {
 		return err
 	}
 	if when == "" {
-		if err := unschedule(dir); err != nil {
+		if err := unschedule(); err != nil {
 			return err
 		}
 		cfg.Schedule = ""
@@ -196,7 +196,7 @@ func schedule(dir, exe string, h, m int) (string, error) {
 }
 
 // unschedule removes whatever schedule registered; removing what is not there is not an error.
-func unschedule(dir string) error {
+func unschedule() error {
 	switch runtime.GOOS {
 	case "darwin":
 		p := launchdPlistPath()

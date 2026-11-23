@@ -23,6 +23,12 @@ const logFormat = "--format=%x1e%H%x1f%aI%x1f%aN%x1f%aE%x1f%B%x1f"
 // gitPath is the git that git() runs: the one on the PATH, or the Command Line Tools' own (gitWorks).
 var gitPath = "git"
 
+// onPath reports whether the program name is on the PATH.
+func onPath(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
+}
+
 // git runs git inside dir. GIT_DIR and friends are dropped so that running
 // from inside a git hook does not redirect the command to the hook's repository.
 func git(dir string, args ...string) (string, error) { return gitStdin(dir, "", args...) }
@@ -172,7 +178,7 @@ func cmdGit(args []string) error {
 // and are waited for, a window opens and it returns at once. At the terminal it asks first; elsewhere,
 // and where it cannot update, it says how.
 func gitUpdate(lang, path string) error {
-	args, how := gitUpdater(runtime.GOOS, path, gitPath, func(n string) bool { _, err := exec.LookPath(n); return err == nil })
+	args, how := gitUpdater(runtime.GOOS, path, gitPath, onPath)
 	if args == nil || !jsonOut && !interactive() {
 		if jsonOut {
 			return printJSON(map[string]any{"started": false, "how": how, "message": gitUpdateHint(lang, path), "url": gitDownload()})
@@ -300,7 +306,7 @@ func gitInstallStart(lang string) error {
 	case "darwin":
 		args, how = []string{"xcode-select", "--install"}, "xcodeSelect"
 	case "windows":
-		if args = gitInstaller("windows", func(n string) bool { _, err := exec.LookPath(n); return err == nil }, false); args != nil {
+		if args = gitInstaller("windows", onPath, false); args != nil {
 			args, how = append(args, "--accept-package-agreements", "--accept-source-agreements"), "winget"
 		}
 	}
@@ -358,7 +364,7 @@ func gitInstaller(goos string, has func(string) bool, root bool) []string {
 // after it. Nothing is installed without a yes.
 func installGit(lang string) bool {
 	warn(lang, "gitMissing")
-	args := gitInstaller(runtime.GOOS, func(name string) bool { _, err := exec.LookPath(name); return err == nil }, os.Geteuid() == 0)
+	args := gitInstaller(runtime.GOOS, onPath, os.Geteuid() == 0)
 	if args == nil {
 		notice(tr(lang, "gitInstallManual"))
 		return false

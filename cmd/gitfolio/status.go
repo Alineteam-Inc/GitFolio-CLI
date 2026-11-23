@@ -284,12 +284,8 @@ func statusJSON(dir string, repos []Repo, commits []Commit, st syncState, cfg Co
 	sideBySide(len(repos), func(i int) { hooks[i] = hookStatus(repos[i].Path) })
 	for i, r := range repos {
 		s := statusOf(r, commits, nil, st)
-		last := ""
-		if !s.last.IsZero() {
-			last = s.lastCommit()
-		}
 		key := r.Provider + "/" + r.Namespace
-		list = append(list, repo{r.Name, r.Path, r.Namespace, s.commits, s.sent, st.Waiting[key] != "", hooks[i], last})
+		list = append(list, repo{r.Name, r.Path, r.Namespace, s.commits, s.sent, st.Waiting[key] != "", hooks[i], localDay(s.last)})
 		if st.Waiting[key] != "" { // a repository removed since the last sync no longer waits
 			waiting[key] = st.Waiting[key]
 		}
@@ -301,14 +297,28 @@ func statusJSON(dir string, repos []Repo, commits []Commit, st syncState, cfg Co
 	if c.loggedIn() {
 		account = c.creds.Email
 	}
-	mode := "automatic"
-	if cfg.AutoSyncOff {
-		mode = "local" // commits are never sent: unsent only counts in automatic mode
-	}
-	res := map[string]any{"account": account, "setUp": c.loggedIn() && len(repos) > 0, "syncMode": mode,
+	// In local mode commits are never sent: unsent only counts in automatic mode.
+	res := map[string]any{"account": account, "setUp": c.loggedIn() && len(repos) > 0, "syncMode": syncMode(cfg),
 		"lastSync": st.LastSync, "lastSyncError": st.LastError, "unsent": unsent, "repositories": list, "waiting": c.waitingJSON(waiting)}
 	maps.Copy(res, versions(dir))
 	return printJSON(res)
+}
+
+// syncMode is how commits reach aline.team: "automatic" right after each push, or "local" (config
+// autosync off).
+func syncMode(cfg Config) string {
+	if cfg.AutoSyncOff {
+		return "local"
+	}
+	return "automatic"
+}
+
+// localDay is t's local date ("2026-10-01"), "" for none.
+func localDay(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Local().Format(time.DateOnly)
 }
 
 // versions is what a status check adds about the software: this GitFolio, a newer release if one was seen
@@ -329,12 +339,6 @@ func versions(dir string) map[string]any {
 // repoJSON is status <name> --json: what the text shows of one repository. dependencies is null while
 // dependency detection is off; languages are changed lines per language, agents commits per AI agent.
 func repoJSON(r Repo, s repoStatus, st syncState, depsOn bool) map[string]any {
-	day := func(t time.Time) string {
-		if t.IsZero() {
-			return ""
-		}
-		return t.Local().Format(time.DateOnly)
-	}
 	var deps map[string][]string
 	if depsOn {
 		deps = s.deps
@@ -342,7 +346,7 @@ func repoJSON(r Repo, s repoStatus, st syncState, depsOn bool) map[string]any {
 	return map[string]any{"name": r.Name, "path": r.Path, "service": r.Provider, "namespace": r.Namespace,
 		"commits": s.commits, "sent": s.sent, "waiting": st.Waiting[r.Provider+"/"+r.Namespace] != "", "fileChanges": s.changes,
 		"linesAdded": s.add, "linesDeleted": s.del, "filesCreated": s.created, "aiCommits": s.ai, "agents": s.agents,
-		"languages": s.lines, "dependencies": deps, "lastCommit": day(s.last), "hooks": hookStatus(r.Path)}
+		"languages": s.lines, "dependencies": deps, "lastCommit": localDay(s.last), "hooks": hookStatus(r.Path)}
 }
 
 // lineCounts is a "+added -deleted" pair of changed-line counts.

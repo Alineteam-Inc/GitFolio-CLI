@@ -204,6 +204,27 @@ func readCommits(dir string) (commits []Commit, err error) {
 	return commits, err
 }
 
+// loadRepoCommits reads the registered repositories and the stored commits under the data lock: a push
+// may be writing them.
+func loadRepoCommits(dir string) (repos []Repo, commits []Commit, err error) {
+	err = withLock(dir, func() error {
+		if repos, err = loadRepos(dir); err == nil {
+			commits, err = readCommits(dir)
+		}
+		return err
+	})
+	return repos, commits, err
+}
+
+// commitsByRepo groups commits by repository ID.
+func commitsByRepo(commits []Commit) map[string][]Commit {
+	byRepo := map[string][]Commit{}
+	for _, c := range commits {
+		byRepo[c.Repo] = append(byRepo[c.Repo], c)
+	}
+	return byRepo
+}
+
 func appendCommits(dir string, commits []Commit) error {
 	return encodeJSONL(filepath.Join(dir, "commits.jsonl"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, commits)
 }
@@ -320,7 +341,7 @@ func scanRepos(dir string, rs []*Repo, rebuild bool, each func(i, added int, err
 	// The reads run on while the first repositories are stored: storing adds to a copy of what is known.
 	storing := storedNow{known: maps.Clone(had.known), noBranch: had.noBranch}
 	for i, r := range rs {
-		n, err := storeScan(dir, cfg, r, <-reads[i], rebuild, registered, storing)
+		n, err := storeScan(dir, cfg, r, <-reads[i], registered, storing)
 		each(i, n, err)
 	}
 	return nil
@@ -354,6 +375,9 @@ type repoRead struct {
 	seen string    // fingerprints what the history counts with (Repo.Seen)
 	all  []Commit  // everyone's commits in rng, without their files
 	need bool      // some of the user's commits are not stored, or are stored in an older format
+	// rebuild: r's stored commits are dropped and collected again (asked for, or stored before branches
+	// or file paths were recorded)
+	rebuild bool
 }
 
 // readRepo reads r's git for a scan and sets what it counts of the whole history on r.
@@ -390,7 +414,8 @@ func readRepo(cfg Config, had storedNow, r *Repo, rebuild bool) (g repoRead) {
 	}
 	g.seen = fingerprint(key)
 	old := rebuild || r.Format < repoFormat
-	g.need = g.need || old || g.rng[0] == "--remotes" && had.noBranch[r.ID]
+	g.rebuild = old || g.rng[0] == "--remotes" && had.noBranch[r.ID]
+	g.need = g.need || g.rebuild
 	// The files of everyone's commits, the slow part, only when the commits or the rules changed.
 	if old || g.seen != r.Seen {
 		all, err := readCommitsOf(r.Path, g.rng, true)
@@ -417,7 +442,7 @@ func readCommitsOf(repo string, rng []string, files bool) ([]Commit, error) {
 }
 
 // storeScan stores the user's commits that readRepo found and are not stored yet.
-func storeScan(dir string, cfg Config, r *Repo, g repoRead, rebuild bool, registered map[string]bool, had storedNow) (int, error) {
+func storeScan(dir string, cfg Config, r *Repo, g repoRead, registered map[string]bool, had storedNow) (int, error) {
 	if g.move != nil {
 		if err := queueMove(dir, *g.move); err != nil {
 			return 0, err
@@ -435,12 +460,8 @@ func storeScan(dir string, cfg Config, r *Repo, g repoRead, rebuild bool, regist
 	if cfg.Deps { // module IDs only: package manager files are read by `deps scan`, not here
 		modules = manifestModules(*r)
 	}
-	// Commits stored before branches or file paths were recorded are collected once more.
-	if r.Format < repoFormat || (rng[0] == "--remotes" && had.noBranch[r.ID]) {
-		rebuild = true
-	}
 	known := had.known // shared by the repositories of this scan, so a commit found again is stored once
-	if rebuild {
+	if g.rebuild {
 		stored, err := readCommits(dir)
 		if err != nil {
 			return 0, err

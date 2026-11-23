@@ -210,16 +210,8 @@ func summarize(commits []Commit, p period, branches bool) workSummary {
 // asked for), with the branch names shown where config ai lets them.
 func aiCommits(dir string, args map[string]any) (repos []Repo, byRepo map[string][]Commit, p period, err error) {
 	lang := detectLang(os.Getenv)
-	var all []Repo
-	var commits []Commit
-	if err = withLock(dir, func() error {
-		var err error
-		if all, err = loadRepos(dir); err != nil {
-			return err
-		}
-		commits, err = readCommits(dir)
-		return err
-	}); err != nil {
+	all, commits, err := loadRepoCommits(dir)
+	if err != nil {
 		return
 	}
 	from, _ := args["from"].(string)
@@ -235,11 +227,7 @@ func aiCommits(dir string, args map[string]any) (repos []Repo, byRepo map[string
 		}
 		repos = slices.DeleteFunc(repos, func(r Repo) bool { return r.ID != all[i].ID })
 	}
-	byRepo = map[string][]Commit{}
-	for _, c := range commits {
-		byRepo[c.Repo] = append(byRepo[c.Repo], c)
-	}
-	return repos, byRepo, p, nil
+	return repos, commitsByRepo(commits), p, nil
 }
 
 func mcpWork(dir string, args map[string]any) (any, error) {
@@ -337,10 +325,7 @@ func mcpTech(dir string, args map[string]any) (any, error) {
 	if !ok {
 		return nil, fmt.Errorf("no tech named %q in the repositories AI tools may see: stack lists them", want)
 	}
-	byRepo := map[string][]Commit{}
-	for _, c := range commits {
-		byRepo[c.Repo] = append(byRepo[c.Repo], c)
-	}
+	byRepo := commitsByRepo(commits)
 	for _, r := range repos {
 		d := data[r.ID]
 		if !slices.ContainsFunc(slices.Collect(maps.Keys(d.techs)), func(k string) bool { return key(k) == want }) {
@@ -439,23 +424,11 @@ func cmdWork(dir string, args []string) error {
 	if err != nil || fs.NArg() > 0 {
 		return failure("usage", workUsage)
 	}
-	var repos []Repo
-	var commits []Commit
-	if err := withLock(dir, func() error { // a push may be writing them
-		var err error
-		if repos, err = loadRepos(dir); err != nil {
-			return err
-		}
-		commits, err = readCommits(dir)
-		return err
-	}); err != nil {
+	repos, commits, err := loadRepoCommits(dir)
+	if err != nil {
 		return err
 	}
-	byRepo := map[string][]Commit{}
-	for _, c := range commits {
-		byRepo[c.Repo] = append(byRepo[c.Repo], c)
-	}
-	w := workOf(repos, byRepo, p, false)
+	w := workOf(repos, commitsByRepo(commits), p, false)
 	if jsonOut {
 		return printJSON(w)
 	}
