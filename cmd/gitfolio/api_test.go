@@ -732,6 +732,11 @@ func TestLoginInTwoRuns(t *testing.T) {
 	if _, err := login("--email", "dev@example.com"); errorCode(err) != "alreadyLoggedIn" {
 		t.Errorf("logged in already: %v", err)
 	}
+	for _, args := range [][]string{{"--github"}, {}} { // a program reads the account on stdout, as after logging in
+		if v, err := login(args...); err != nil || v["alreadyLoggedIn"] != true || v["email"] != "dev@example.com" || v["created"] != false {
+			t.Errorf("login %v --json, logged in already: %v %v", args, v, err)
+		}
+	}
 	if v, err := jsonStdout(t, func() error { return cmdWhoami(dir, []string{"--json"}) }); err != nil || v["loggedIn"] != true || v["email"] != "dev@example.com" {
 		t.Errorf("whoami --json: %v %v", v, err)
 	}

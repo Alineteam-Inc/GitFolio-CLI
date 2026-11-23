@@ -41,6 +41,9 @@ func cmdLogin(dir string, args []string) error {
 		if *email != "" {
 			return failure("alreadyLoggedIn", c.creds.Email)
 		}
+		if jsonOut { // the account, as after logging in
+			return printJSON(map[string]any{"email": c.creds.Email, "created": false, "verifiedEmails": append([]string{}, c.creds.Verified...), "alreadyLoggedIn": true})
+		}
 		say(lang, "alreadyLoggedIn", c.creds.Email)
 		return nil
 	}
