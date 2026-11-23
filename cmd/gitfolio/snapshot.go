@@ -169,8 +169,14 @@ func snapshots(repos []Repo, commits []Commit, author string) []snapshot {
 	for _, k := range keys {
 		r := slices.MaxFunc(copies[k], func(a, b Repo) int { return cmp.Compare(a.AsOf, b.AsOf) }) // the first on a tie
 		var mine []Commit
+		hashes := map[string]bool{} // a commit stored under both copies (one removed and added back) counts once
 		for _, x := range copies[k] {
-			mine = append(mine, byRepo[x.ID]...)
+			for _, c := range byRepo[x.ID] {
+				if !hashes[c.Hash] {
+					hashes[c.Hash] = true
+					mine = append(mine, c)
+				}
+			}
 		}
 		s := snapshot{Format: snapshotFormat, Provider: r.Provider, Namespace: r.Namespace, AuthorEmail: author, AsOf: r.AsOf, Days: map[string]*statDay{}}
 		day := func(k string) *statDay {

@@ -86,9 +86,11 @@ func TestSnapshotOfCopies(t *testing.T) {
 	commits := []Commit{
 		{Repo: "x", Hash: "1", Date: "2026-09-01T10:00:00Z", Branch: "main", Message: "feat: a", CreationType: creationHuman, Files: []FileStat{{Name: "a.go"}}},
 		{Repo: "y", Hash: "2", Date: "2026-09-02T10:00:00Z", Branch: "main", Message: "feat: b", CreationType: creationHuman, Files: []FileStat{{Name: "b.go"}}},
+		{Repo: "y", Hash: "1", Date: "2026-09-01T10:00:00Z", Branch: "main", Message: "feat: a", CreationType: creationHuman, Files: []FileStat{{Name: "a.go"}}}, // under both
 	}
 	got := snapshots(repos, commits, "me@example.com")
 	if len(got) != 1 || got[0].Days["2026-09-01"].Commits[0] != 1 || got[0].Days["2026-09-02"].Commits[0] != 1 ||
+		got[0].Days["2026-09-01"].Mine[0] != 1 || got[0].Days["2026-09-01"].Langs["Go"][0] != 1 ||
 		got[0].Days["2026-09-01"].Touches[0] != 3 || got[0].AsOf != "2026-09-05T00:00:00Z" {
 		b, _ := json.Marshal(got)
 		t.Errorf("snapshots = %s", b)
