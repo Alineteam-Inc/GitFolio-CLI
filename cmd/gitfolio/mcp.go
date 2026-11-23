@@ -58,6 +58,7 @@ var mcpTools = []mcpTool{
 			"The saved type unless refresh is true. In local mode the " +
 			"statistics are sent to aline.team first, as gitfolio stats does.",
 		InputSchema: object(map[string]any{"refresh": prop("boolean", "Ask aline.team again instead of using the saved one.")}),
+		Annotations: mcpWrites, // sends in local mode
 		run:         mcpDevType,
 	},
 	{
@@ -142,8 +143,10 @@ var mcpTools = []mcpTool{
 		Name:  "portfolio",
 		Title: "Portfolio",
 		Description: "The user's portfolio from their git history in Markdown, as gitfolio portfolio writes it: developer " +
-			"type, tech stack (hidden ones left out) and repositories, the latest work first. Nothing is written to a file.",
-		run: mcpPortfolio,
+			"type, tech stack (hidden ones left out) and repositories, the latest work first. Nothing is written to a file. " +
+			"In local mode the statistics are sent to aline.team first, for the developer type, as gitfolio stats does.",
+		Annotations: mcpWrites, // sends in local mode
+		run:         mcpPortfolio,
 	},
 }
 

@@ -106,6 +106,12 @@ func TestMCP(t *testing.T) {
 	if tools := got["2"].Result.Tools; len(tools) != len(mcpTools) || len(tools) < 6 || tools[0].Annotations["readOnlyHint"] != true || tools[1].InputSchema["type"] != "object" {
 		t.Errorf("tools/list = %+v", tools)
 	}
+	// A client may run a read-only tool without asking: devtype and portfolio send the statistics in local mode.
+	for _, tool := range mcpTools {
+		if (tool.Name == "devtype" || tool.Name == "portfolio") && tool.Annotations["readOnlyHint"] != false {
+			t.Errorf("%s is marked read-only", tool.Name)
+		}
+	}
 	if s := text("3"); !strings.Contains(s, `"name":"app"`) || !strings.Contains(s, `"repository":"me/app"`) ||
 		!strings.Contains(s, `"commits":1`) || !strings.Contains(s, `"hooks":"manual"`) || !strings.Contains(s, `"gitVersion":"`) ||
 		strings.Contains(s, "/home/me") || got["3"].Result.IsError {
