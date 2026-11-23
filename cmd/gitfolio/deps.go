@@ -206,6 +206,10 @@ func parseManifest(name, s string) []dep {
 			if i := strings.IndexByte(line, '#'); i >= 0 {
 				line = line[:i]
 			}
+			if i := strings.Index(line, " --"); i >= 0 {
+				line = line[:i] // options of the requirement: --hash=sha256:…
+			}
+			line = strings.TrimSuffix(strings.TrimSpace(line), `\`) // continued on the next line
 			if d, ok := pep508(line); ok {
 				deps = append(deps, d)
 			}
@@ -314,7 +318,7 @@ func parseGoMod(s string) []dep {
 			continue
 		case strings.HasPrefix(line, "require "):
 			line = strings.TrimPrefix(line, "require ")
-		case !block:
+		case !block || strings.HasPrefix(line, "//"):
 			continue
 		}
 		if f := strings.Fields(line); len(f) >= 2 && !strings.Contains(line, "// indirect") {
