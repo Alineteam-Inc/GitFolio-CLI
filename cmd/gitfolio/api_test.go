@@ -553,7 +553,6 @@ func TestZoneFromPath(t *testing.T) {
 	}
 }
 
-// A token the server rejects (A001: expired, revoked or unknown) is removed locally.
 // A redirect goes only where the API may be (https, or http on this computer): the login token would
 // go there too, in the clear on http.
 func TestRedirectOnlyWhereTheAPIMayBe(t *testing.T) {
@@ -615,6 +614,7 @@ func TestRejectedTokenKeepsNewLogin(t *testing.T) {
 	}
 }
 
+// A token the server rejects (A001: expired, revoked or unknown) is removed locally.
 func TestRejectedTokenIsRemoved(t *testing.T) {
 	f := &fakeAline{} // no valid token on the server
 	srv := httptest.NewServer(f.handler())
