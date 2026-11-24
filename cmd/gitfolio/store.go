@@ -47,6 +47,9 @@ type aiExposure struct {
 	Messages string `json:"messages,omitempty"` // "" (off), "subjects" or "full": what of the commit messages
 	Branches bool   `json:"branches,omitempty"` // the branch names too
 	Hidden   bool   `json:"hidden,omitempty"`   // not shown at all
+	// Number is n in "Repository n" once anonymous, kept for good (numberAnonymous): hiding, renaming or
+	// removing another repository never moves it, so an AI tool's earlier name never means another one.
+	Number int `json:"number,omitempty"`
 }
 
 const anonymousName = "-"
@@ -142,7 +145,22 @@ func loadRepos(dir string) (repos []Repo, err error) {
 }
 
 func saveRepos(dir string, repos []Repo) error {
+	numberAnonymous(repos)
 	return saveJSON(filepath.Join(dir, "repos.json"), repos)
+}
+
+// numberAnonymous gives each anonymous repository without a number the next one free, in the order
+// registered: the number it keeps (aiExposure.Number).
+func numberAnonymous(repos []Repo) {
+	next := 1
+	for _, r := range repos {
+		next = max(next, r.AI.Number+1)
+	}
+	for i := range repos {
+		if repos[i].AI.Name == anonymousName && repos[i].AI.Number == 0 {
+			repos[i].AI.Number, next = next, next+1
+		}
+	}
 }
 
 // loadConfig reads the settings. Before any are saved GitFolio is in local mode: it sends nothing by

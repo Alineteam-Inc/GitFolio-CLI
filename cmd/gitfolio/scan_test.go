@@ -527,7 +527,7 @@ func TestLaterSettingsKept(t *testing.T) {
 	if err := saveRepos(dir, repos); err != nil {
 		t.Fatal(err)
 	}
-	if again, _ := loadRepos(dir); again[0].AI != (aiExposure{Name: anonymousName, Hidden: true}) {
+	if again, _ := loadRepos(dir); again[0].AI != (aiExposure{Name: anonymousName, Hidden: true, Number: 1}) {
 		t.Errorf("saved: ai %+v", again[0].AI)
 	}
 }

@@ -200,9 +200,9 @@ func cmdStatus(dir string, args []string) error {
 		return statusJSON(dir, repos, commits, st, cfg)
 	}
 	if len(args) > 0 {
-		r, ok := findRepo(repos, args[0])
-		if !ok {
-			return failure("notRegistered", args[0])
+		r, err := findRepo(repos, args[0])
+		if err != nil {
+			return err
 		}
 		s := statusOf(r, commits, deps, st)
 		if jsonOut {
@@ -369,20 +369,31 @@ func gitLines(s string) string {
 	return lineCounts.ReplaceAllString(s, "\x1b[32m+${1}\x1b[39m \x1b[31m-${2}\x1b[39m")
 }
 
-// findRepo finds a registered repository by its name or by a path inside it.
-func findRepo(repos []Repo, arg string) (Repo, bool) {
-	if i := slices.IndexFunc(repos, func(r Repo) bool { return r.Name == arg }); i >= 0 {
-		return repos[i], true
+// findRepo finds a registered repository by its name or by a path inside it. A name that more than one
+// has is refused: hiding, say, one of two called api must not leave the other shown.
+func findRepo(repos []Repo, arg string) (Repo, error) {
+	var named []string
+	for _, r := range repos {
+		if r.Name == arg {
+			named = append(named, tildePath(r.Path))
+		}
+	}
+	switch len(named) {
+	case 0:
+	case 1:
+		return repos[slices.IndexFunc(repos, func(r Repo) bool { return r.Name == arg })], nil
+	default:
+		return Repo{}, failure("repoNameTwice", arg, strings.Join(named, ", "))
 	}
 	top, err := topLevel(arg)
 	if err != nil {
 		if top, err = filepath.Abs(arg); err != nil {
-			return Repo{}, false
+			return Repo{}, failure("notRegistered", arg)
 		}
 	}
 	i := repoIndex(repos, top)
 	if i < 0 {
-		return Repo{}, false
+		return Repo{}, failure("notRegistered", arg)
 	}
-	return repos[i], true
+	return repos[i], nil
 }

@@ -566,3 +566,61 @@ func TestMCPGithub(t *testing.T) {
 		t.Errorf("work emails %v", cfg.Emails)
 	}
 }
+
+// An anonymous repository keeps its number: hiding or removing another one moves none, so a name an AI
+// tool used earlier never comes to mean another repository.
+func TestAnonymousNumbersStay(t *testing.T) {
+	dir := t.TempDir()
+	anon := aiExposure{Name: anonymousName}
+	names := func(repos []Repo) (s []string) {
+		for _, v := range aiView("en", repos) {
+			s = append(s, v.Name)
+		}
+		return s
+	}
+	repos := []Repo{{ID: "a", Name: "a", AI: anon}, {ID: "b", Name: "b", AI: anon}, {ID: "c", Name: "c", AI: anon}}
+	if got := names(repos); !slices.Equal(got, []string{"Repository 1", "Repository 2", "Repository 3"}) {
+		t.Fatalf("names = %q", got)
+	}
+	repos[0].AI.Hidden = true // Repository 2 was b, and stays b
+	if got := names(repos); !slices.Equal(got, []string{"Repository 2", "Repository 3"}) {
+		t.Errorf("after hiding the first: %q", got)
+	}
+	if i, ok := aiRepo("en", repos, "Repository 2"); !ok || repos[i].ID != "b" {
+		t.Errorf("Repository 2 is %d %v", i, ok)
+	}
+	if err := saveRepos(dir, repos); err != nil {
+		t.Fatal(err)
+	}
+	saved, _ := loadRepos(dir)
+	if err := saveRepos(dir, saved[1:]); err != nil { // the first removed
+		t.Fatal(err)
+	}
+	saved, _ = loadRepos(dir)
+	saved = append(saved, Repo{ID: "d", Name: "d", AI: anon})
+	if got := names(saved); !slices.Equal(got, []string{"Repository 2", "Repository 3", "Repository 4"}) {
+		t.Errorf("after removing the first and adding one: %q", got)
+	}
+}
+
+// A name two registered repositories have is refused, here and for AI tools: hiding one of two called
+// api must not leave the other one shown under its name.
+func TestRepoNameTwice(t *testing.T) {
+	dir := t.TempDir()
+	repos := []Repo{{ID: "a", Name: "api", Path: "/oss/api"}, {ID: "b", Name: "api", Path: "/work/api"}}
+	if _, err := findRepo(repos, "api"); errorCode(err) != "repoNameTwice" {
+		t.Errorf("findRepo: %v", err)
+	}
+	if err := saveRepos(dir, repos); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmdConfigAI(dir, []string{"hide", "api"}); errorCode(err) != "repoNameTwice" {
+		t.Errorf("config ai hide api: %v", err)
+	}
+	if saved, _ := loadRepos(dir); saved[0].AI.Hidden || saved[1].AI.Hidden {
+		t.Errorf("one was hidden: %+v", saved)
+	}
+	if i, ok := aiRepo("en", repos, "api"); ok {
+		t.Errorf("an AI tool's api found %d", i)
+	}
+}

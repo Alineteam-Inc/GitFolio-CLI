@@ -526,7 +526,8 @@ func mcpPortfolio(dir string, _ map[string]any) (any, error) {
 // git service unless they go by their own name.
 func aiView(lang string, repos []Repo) []Repo {
 	var view []Repo
-	n := 0
+	repos = slices.Clone(repos)
+	numberAnonymous(repos) // as saveRepos will: one saved before numbers were kept reads the same
 	for _, r := range repos {
 		if r.AI.Hidden {
 			continue
@@ -534,8 +535,7 @@ func aiView(lang string, repos []Repo) []Repo {
 		switch r.AI.Name {
 		case "":
 		case anonymousName:
-			n++
-			r.Name, r.Namespace = fmt.Sprintf(tr(lang, "aiAnonymous"), n), ""
+			r.Name, r.Namespace = fmt.Sprintf(tr(lang, "aiAnonymous"), r.AI.Number), ""
 		default:
 			r.Name, r.Namespace = r.AI.Name, ""
 		}
@@ -548,10 +548,12 @@ func aiView(lang string, repos []Repo) []Repo {
 // aiRepo finds the repository an AI tool means: by the name it sees, or by a path in it (where the tool
 // works). Never by its own name: that would tell what a hidden or renamed repository is called.
 func aiRepo(lang string, repos []Repo, arg string) (int, bool) {
-	for _, v := range aiView(lang, repos) {
-		if v.Name == arg {
-			return slices.IndexFunc(repos, func(r Repo) bool { return r.ID == v.ID }), true
+	view := aiView(lang, repos)
+	if n := slices.IndexFunc(view, func(v Repo) bool { return v.Name == arg }); n >= 0 {
+		if slices.ContainsFunc(view[n+1:], func(v Repo) bool { return v.Name == arg }) {
+			return -1, false // two shown by that name: it tells not which
 		}
+		return slices.IndexFunc(repos, func(r Repo) bool { return r.ID == view[n].ID }), true
 	}
 	top, err := topLevel(arg)
 	if err != nil {
@@ -634,9 +636,9 @@ func cmdConfigAI(dir string, args []string) error {
 	if !slices.Contains(words, args[0]) || len(args) < 2 {
 		return wrongWord("config ai", args[0], words, configAIUsage)
 	}
-	r, ok := findRepo(repos, args[1])
-	if !ok {
-		return failure("notRegistered", args[1])
+	r, err := findRepo(repos, args[1])
+	if err != nil {
+		return err
 	}
 	i := slices.IndexFunc(repos, func(x Repo) bool { return x.ID == r.ID })
 	key, value := args[0], strings.Join(args[2:], " ")

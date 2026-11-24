@@ -1137,6 +1137,11 @@ var messages = map[string]map[string]string{
 		"ko": "AI 도구에 숨김",
 		"ja": "AI ツールに非表示",
 	},
+	"repoNameTwice": {
+		"en": "More than one registered repository is called %s (%s): name it by its path.\n",
+		"ko": "%s(이)라는 등록 저장소가 여럿입니다(%s). 경로로 지정하세요.\n",
+		"ja": "%s という登録リポジトリが複数あります(%s)。パスで指定してください。\n",
+	},
 	"aiAnonymous": {
 		"en": "Repository %d",
 		"ko": "저장소 %d",

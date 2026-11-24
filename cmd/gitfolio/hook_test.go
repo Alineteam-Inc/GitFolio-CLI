@@ -535,14 +535,14 @@ func TestLinkedWorktreeIsItsRepository(t *testing.T) {
 		t.Errorf("findRepos = %q, want %q", got, []string{mainTop, bareTop})
 	}
 	repos := []Repo{newRepo(mainTop)}
-	if r, ok := findRepo(repos, filepath.Join(feat)); !ok || r.Path != mainTop {
-		t.Errorf("findRepo(worktree) = %v %v", r, ok)
+	if r, err := findRepo(repos, filepath.Join(feat)); err != nil || r.Path != mainTop {
+		t.Errorf("findRepo(worktree) = %v %v", r, err)
 	}
 	if i, ok := aiRepo("en", repos, feat); !ok || i != 0 {
 		t.Errorf("aiRepo(worktree) = %d %v", i, ok)
 	}
-	if r, ok := findRepo([]Repo{newRepo(mainTop), newRepo(featTop)}, feat); !ok || r.Path != featTop {
-		t.Errorf("a worktree registered as itself: findRepo = %v %v", r, ok)
+	if r, err := findRepo([]Repo{newRepo(mainTop), newRepo(featTop)}, feat); err != nil || r.Path != featTop {
+		t.Errorf("a worktree registered as itself: findRepo = %v %v", r, err)
 	}
 	// A bare repository cloned into proj/.git, its worktrees beside it: proj is no working tree.
 	proj := filepath.Join(base, "proj")
