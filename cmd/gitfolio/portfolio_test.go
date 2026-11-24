@@ -43,7 +43,7 @@ Ships fast.
 
 #fast #steady
 
-| Score | Human only | With AI |
+| Score (out of 100) | Own work | Work with AI |
 | --- | ---: | ---: |
 | Agility | 72 | 75 |
 | Stability | 60 | - |

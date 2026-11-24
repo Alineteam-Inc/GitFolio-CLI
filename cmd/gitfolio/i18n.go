@@ -1459,9 +1459,9 @@ var messages = map[string]map[string]string{
 		"ja": "# 開発ポートフォリオ\n\nGitFolio が git の履歴から作成しました(%s)。リポジトリ %d 件、コミット %s 件、%s。\n",
 	},
 	"portfolioType": {
-		"en": "## Developer type\n\n**%s** · main position %s · %d, by aline.team\n%s| Score | Human only | With AI |\n| --- | ---: | ---: |\n| Agility | %s | %s |\n| Stability | %s | %s |\n| Contribution | %s | %s |\n| Adaptability | %s | %s |\n| Consistency | %s | %s |\n\nType with AI: %s\n",
-		"ko": "## 개발자 유형\n\n**%s** · 주 포지션 %s · %d년, aline.team 산출\n%s| 능력치 | 사람만 | AI 포함 |\n| --- | ---: | ---: |\n| 민첩성 | %s | %s |\n| 안정성 | %s | %s |\n| 기여도 | %s | %s |\n| 적응성 | %s | %s |\n| 일관성 | %s | %s |\n\nAI 활용 유형: %s\n",
-		"ja": "## 開発者タイプ\n\n**%s** · 主なポジション %s · %d年、aline.team 算出\n%s| 能力値 | 人のみ | AI 込み |\n| --- | ---: | ---: |\n| 俊敏性 | %s | %s |\n| 安定性 | %s | %s |\n| 貢献度 | %s | %s |\n| 適応性 | %s | %s |\n| 一貫性 | %s | %s |\n\nAI 活用タイプ: %s\n",
+		"en": "## Developer type\n\n**%s** · main position %s · %d, by aline.team\n%s| Score (out of 100) | Own work | Work with AI |\n| --- | ---: | ---: |\n| Agility | %s | %s |\n| Stability | %s | %s |\n| Contribution | %s | %s |\n| Adaptability | %s | %s |\n| Consistency | %s | %s |\n\nType with AI: %s\n",
+		"ko": "## 개발자 유형\n\n**%s** · 주 포지션 %s · %d년, aline.team 산출\n%s| 능력치 (100점 만점) | 직접 작업 | AI와 함께한 작업 |\n| --- | ---: | ---: |\n| 민첩성 | %s | %s |\n| 안정성 | %s | %s |\n| 기여도 | %s | %s |\n| 적응성 | %s | %s |\n| 일관성 | %s | %s |\n\nAI 활용 유형: %s\n",
+		"ja": "## 開発者タイプ\n\n**%s** · 主なポジション %s · %d年、aline.team 算出\n%s| 能力値(100点満点) | 自分の作業 | AI と一緒の作業 |\n| --- | ---: | ---: |\n| 俊敏性 | %s | %s |\n| 安定性 | %s | %s |\n| 貢献度 | %s | %s |\n| 適応性 | %s | %s |\n| 一貫性 | %s | %s |\n\nAI 活用タイプ: %s\n",
 	},
 	"portfolioStack": {
 		"en": "## Tech stack\n\nFrom the first to the last commit of the repositories using each, as aline.team works it out.\n\n| Kind | Name | Period | Months | Repositories |\n| --- | --- | --- | ---: | ---: |\n",
