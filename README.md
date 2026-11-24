@@ -12,8 +12,8 @@ languages and frameworks, what kind of work it was, and how much of it you did w
 
 - **A command line tool** (macOS, Linux, Windows) by [Alineteam Inc.](https://aline.team). It reads the
   metadata of the commits you authored and pushed, on your computer — never source code.
-- **With [aline.team](https://aline.team)'s API** it works out your developer type (five scores, with and
-  without AI) and how long you used each technology.
+- **With [aline.team](https://aline.team)'s API** it works out your developer type (five scores out of 100, for your own work and
+  for the work made with AI) and how long you used each technology.
 - **With your AI coding tool** (Claude Code, Codex and others that run MCP servers) it gives the AI those
   facts, so the AI can interview you briefly and write your portfolio, resume or tech stack career —
   only from GitFolio's numbers and your answers.
@@ -224,7 +224,7 @@ Releases up to v0.4.1 were published under MIT.
 
 - **명령줄 도구**(macOS·Linux·Windows, [Alineteam Inc.](https://aline.team))입니다. 내가 작성하고 push한 커밋의
   메타데이터를 이 컴퓨터에서 읽습니다. 소스 코드는 읽지 않습니다.
-- **[aline.team](https://aline.team) API로** 개발자 유형(능력치 다섯 가지, AI 포함·미포함)과 기술별 사용 기간을 계산합니다.
+- **[aline.team](https://aline.team) API로** 개발자 유형(100점 만점 능력치 다섯 가지, 직접 작업과 AI와 함께한 작업 각각)과 기술별 사용 기간을 계산합니다.
 - **AI 코딩 도구와 함께**(Claude Code, Codex 등 MCP를 쓰는 도구) 이 사실을 AI에게 넘겨, AI가 짧게 묻고 포트폴리오·이력서·
   기술 스택 커리어를 쓰게 합니다. GitFolio의 숫자와 내 답만으로 씁니다.
 - **무엇이 컴퓨터 밖으로 나갈지는 내가 정합니다.** GitFolio는 로컬 모드로 시작해, 평소에는 아무것도 보내지 않고

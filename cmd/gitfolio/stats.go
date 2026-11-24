@@ -262,9 +262,9 @@ func showDevType(lang string, cache devTypeCache, saved bool) {
 		if v == nil {
 			return "-"
 		}
-		s := fmt.Sprintf("%3d %s", *v, scoreBar(*v))
+		s := fmt.Sprintf("%3d/100 %s", *v, scoreBar(*v)) // out of 100, as everywhere in GitFolio
 		if ai != nil {
-			s += fmt.Sprintf("  AI %d", *ai)
+			s += fmt.Sprintf("  AI %d/100", *ai)
 		}
 		return s
 	}
